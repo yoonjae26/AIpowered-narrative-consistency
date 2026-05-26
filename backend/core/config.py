@@ -23,6 +23,9 @@ class Settings(BaseSettings):
 	rate_limit_window_seconds: int = 60
 	redis_url: str = "redis://localhost:6379/0"
 	database_url: str = "sqlite:///./narrativeos.db"
+	llm_provider: str = "qwen"
+	llm_model: str = "qwen2.5:7b-instruct"
+	llm_base_url: str | None = None
 	openai_api_key: str | None = None
 	anthropic_api_key: str | None = None
 	langfuse_public_key: str | None = None

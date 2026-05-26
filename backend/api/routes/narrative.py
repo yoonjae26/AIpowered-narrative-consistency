@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Body, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import get_db
+from backend.database.repositories.canon_repository import CanonRepository
 from backend.database.repositories.character_repository import CharacterRepository
 from backend.database.repositories.lore_repository import LoreRepository
 from backend.database.repositories.relationship_repository import RelationshipRepository
@@ -12,6 +13,7 @@ from backend.database.repositories.scene_repository import SceneRepository
 from backend.database.repositories.timeline_repository import TimelineRepository
 from backend.narrative.character.models import CharacterState, CharacterUpdate
 from backend.narrative.relationships.relationship_types import RelationshipType
+from backend.narrative.state_engine import NarrativeStateMutationEngine
 
 
 router = APIRouter(prefix="/narrative", tags=["narrative"])
@@ -38,26 +40,58 @@ class SceneCreate(BaseModel):
 
 
 class RelationshipCreate(BaseModel):
-	...existing code...
-
-# --- State Mutation Engine Integration ---
-from backend.narrative.state_engine import NarrativeStateMutationEngine
-from fastapi import Body
+	source: str
+	target: str
+	relationship_type: RelationshipType
+	strength: float = 0.5
+	note: str | None = None
 
 class SceneInput(BaseModel):
 	scene_text: str
+	scene_title: str | None = None
 	context: dict = Field(default_factory=dict)
 
-# Dependency to provide the state engine with repositories
-def get_state_engine(db: Session = Depends(get_db)):
+
+class BranchCreate(BaseModel):
+	name: str
+	from_branch: str | None = None
+
+
+class BranchMergeRequest(BaseModel):
+	source_branch: str
+	target_branch: str | None = None
+
+
+class CherryPickRequest(BaseModel):
+	source_branch: str
+	event_ids: list[str] = Field(default_factory=list)
+	target_branch: str | None = None
+
+
+class SnapshotRollbackRequest(BaseModel):
+	snapshot_id: str
+
+
+class QueryRequest(BaseModel):
+	query: str
+
+
+def get_state_engine(db: Session = Depends(get_db)) -> NarrativeStateMutationEngine:
+	from backend.llm.providers import create_llm_provider
+	try:
+		llm_provider = create_llm_provider()
+	except Exception:
+		llm_provider = None
 	repositories = {
+		"canon": CanonRepository(db),
 		"character": CharacterRepository(db),
 		"lore": LoreRepository(db),
 		"relationship": RelationshipRepository(db),
 		"scene": SceneRepository(db),
 		"timeline": TimelineRepository(db),
 	}
-	return NarrativeStateMutationEngine(repositories)
+	return NarrativeStateMutationEngine(repositories, llm_provider=llm_provider)
+
 
 @router.post("/state-mutation", summary="Process scene input and mutate narrative state")
 def process_scene_input(
@@ -65,15 +99,151 @@ def process_scene_input(
 	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
 ):
 	"""
-	Accepts raw scene text, runs the state mutation pipeline, and returns the result.
+	Accepts raw scene text, runs the full mutation pipeline
+	(entity extraction → event generation → state mutation → persistence → consistency check)
+	and returns the structured result.
 	"""
-	result = state_engine.process_scene(input.scene_text, input.context)
-	return result
-	source: str
-	target: str
-	relationship_type: RelationshipType
-	strength: float = 0.5
-	note: str | None = None
+	ctx = dict(input.context)
+	if input.scene_title:
+		ctx["scene_title"] = input.scene_title
+	return state_engine.process_scene(input.scene_text, ctx)
+
+
+@router.post("/version-control/branches")
+def create_branch(
+	request: BranchCreate,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.create_branch(request.name, from_branch=request.from_branch)
+
+
+@router.get("/version-control/branches")
+def list_branches(
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> list[dict[str, object]]:
+	return state_engine.list_branches()
+
+
+@router.post("/version-control/merge")
+def merge_branch(
+	request: BranchMergeRequest,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object] | None:
+	return state_engine.merge_branch(request.source_branch, target_branch=request.target_branch)
+
+
+@router.post("/version-control/cherry-pick")
+def cherry_pick(
+	request: CherryPickRequest,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object] | None:
+	return state_engine.cherry_pick(request.source_branch, event_ids=request.event_ids, target_branch=request.target_branch)
+
+
+@router.post("/version-control/checkout/{branch_name}")
+def checkout_branch(
+	branch_name: str,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object] | None:
+	return state_engine.checkout_branch(branch_name)
+
+
+@router.get("/version-control/snapshots")
+def list_snapshots(
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> list[dict[str, object]]:
+	return state_engine.list_snapshots()
+
+
+@router.get("/version-control/diff")
+def diff_snapshots(
+	snapshot_a: str,
+	snapshot_b: str,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, str]:
+	return {"diff": state_engine.diff_snapshots(snapshot_a, snapshot_b)}
+
+
+@router.post("/version-control/rollback")
+def rollback_snapshot(
+	request: SnapshotRollbackRequest,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object] | None:
+	return state_engine.rollback_to_snapshot(request.snapshot_id)
+
+
+@router.get("/event-sourcing/replay")
+def replay_branch(
+	branch: str | None = None,
+	to_event_id: str | None = None,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.replay_branch(branch=branch, to_event_id=to_event_id)
+
+
+@router.get("/reality/replay-determinism")
+def replay_determinism(
+	branch: str | None = None,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.replay_determinism(branch=branch)
+
+
+@router.get("/reality/branch-verification")
+def verify_branch_replay(
+	branch: str | None = None,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.verify_branch_replay(branch=branch)
+
+
+@router.get("/reality/snapshot-integrity/{snapshot_id}")
+def verify_snapshot_integrity(
+	snapshot_id: str,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.verify_snapshot_integrity(snapshot_id)
+
+
+@router.post("/query")
+def query_story(
+	request: QueryRequest,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.query(request.query)
+
+
+@router.get("/relationships/graph/{character_id}")
+def relationship_graph_summary(
+	character_id: str,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.relationship_summary(character_id)
+
+
+@router.get("/relationships/graph")
+def relationship_dimension_query(
+	dimension: str,
+	minimum: float = 0.5,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> list[dict[str, object]]:
+	return state_engine.relationship_dimension(dimension=dimension, minimum=minimum)
+
+
+@router.get("/knowledge-graph/summary")
+def knowledge_graph_summary(
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.knowledge_graph_summary()
+
+
+@router.get("/knowledge-graph/traverse")
+def knowledge_graph_traverse(
+	node_id: str,
+	depth: int = 1,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.knowledge_graph_traverse(node_id=node_id, depth=depth)
 
 
 @router.get("/summary")
