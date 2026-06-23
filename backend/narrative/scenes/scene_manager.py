@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 
 from backend.database.repositories.scene_repository import SceneRepository
 
@@ -11,7 +11,9 @@ class Scene:
 	summary: str | None = None
 	beats: list[str] = field(default_factory=list)
 	characters: list[str] = field(default_factory=list)
-	created_at: datetime = field(default_factory=datetime.utcnow)
+	created_at: datetime = field(
+    default_factory=lambda: datetime.now(UTC)
+)
 
 
 class SceneManager:

@@ -10,7 +10,8 @@ import {
 	stripHtml,
 } from "../stores";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE =
+	(import.meta.env.VITE_API_BASE as string | undefined) || "http://localhost:8001";
 
 function mergeReferenceNotes(result: NarrativeMutationResponse | null): string[] {
 	if (!result?.memory?.retrieved) {
@@ -76,12 +77,19 @@ export function useNarrativeIde() {
 				}),
 			});
 			const payload = (await response.json()) as NarrativeMutationResponse;
-			if (!response.ok || !payload.success) {
-				throw new Error(payload.error || `HTTP ${response.status}`);
-			}
 			setLastResult(payload);
 			const issuesFromMutation = buildIssuesFromMutation(payload);
 			setPipelineIssues(issuesFromMutation);
+
+			if (!response.ok) {
+				throw new Error(payload.error || `HTTP ${response.status}`);
+			}
+
+			if (!payload.success) {
+				setErrorMessage(payload.error || payload.gate?.message || "Scene did not pass pre-persist gate.");
+				return;
+			}
+
 			await refreshRelationshipGraph();
 		} catch (error) {
 			setErrorMessage(error instanceof Error ? error.message : String(error));

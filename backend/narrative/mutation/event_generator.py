@@ -13,11 +13,11 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
-
 from backend.llm.providers.base import BaseLLMProvider, LLMMessage
 from backend.narrative.mutation.models import EventType, ExtractedEntities, NarrativeEvent
+from backend.narrative.semantic_relation_extractor import KoreanSemanticRelationExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ Scene text:
 class EventGenerator:
     def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
         self._llm = llm_provider
+        self._semantic_extractor = KoreanSemanticRelationExtractor()
 
     # ------------------------------------------------------------------
     # Public interface
@@ -77,7 +78,7 @@ class EventGenerator:
 
     def generate(self, scene_text: str, entities: ExtractedEntities,
                  scene_title: str | None = None) -> list[NarrativeEvent]:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         events: list[NarrativeEvent] = []
 
         # Always open the scene
@@ -94,6 +95,10 @@ class EventGenerator:
         action_events = self._events_from_actions(entities, scene_title, now)
         events.extend(action_events)
         covered_subjects = {e.subject.lower() for e in action_events}
+
+        semantic_events = self._events_from_semantics(scene_text, entities, scene_title, now)
+        events.extend(semantic_events)
+        covered_subjects.update(e.subject.lower() for e in semantic_events)
 
         # 2. LLM events (if no actions found or LLM available)
         if self._llm is not None and not action_events:
@@ -135,6 +140,53 @@ class EventGenerator:
             timestamp=now,
         ))
 
+        return events
+
+    def _events_from_semantics(
+        self,
+        scene_text: str,
+        entities: ExtractedEntities,
+        scene_title: str | None,
+        now: datetime,
+    ) -> list[NarrativeEvent]:
+        known_names = [entity.name for entity in entities.characters]
+        relations = self._semantic_extractor.extract(scene_text, known_character_names=known_names)
+
+        events: list[NarrativeEvent] = []
+        for relation in relations:
+            if relation.relation == "has_emotion":
+                predicate = f"{relation.subject} feels {relation.value}"
+                attributes = {
+                    "relation_type": relation.relation,
+                    "emotion": relation.value,
+                    "surface_descriptor": relation.surface,
+                    "semantic_confidence": relation.confidence,
+                    "confidence": relation.confidence,
+                    "provisional": relation.provisional,
+                }
+            else:
+                predicate = f"{relation.subject} has trait {relation.value}"
+                attributes = {
+                    "relation_type": relation.relation,
+                    "trait": relation.value,
+                    "surface_descriptor": relation.surface,
+                    "semantic_confidence": relation.confidence,
+                    "confidence": relation.confidence,
+                    "provisional": relation.provisional,
+                }
+
+            events.append(
+                NarrativeEvent(
+                    event_type=EventType.CHARACTER_CHANGES,
+                    subject=relation.subject,
+                    predicate=predicate,
+                    target=relation.value,
+                    action=relation.relation,
+                    attributes=attributes,
+                    source_scene=scene_title,
+                    timestamp=now,
+                )
+            )
         return events
 
     # ------------------------------------------------------------------
@@ -216,7 +268,7 @@ class EventGenerator:
             items = json.loads(m.group())
 
         events: list[NarrativeEvent] = []
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         for item in items:
             try:
                 etype = EventType(item["event_type"])

@@ -1,11 +1,16 @@
+# =========================
+
 # Python
-__pycache__/
+
+# =========================
+
+**pycache**/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
 build/
-develop-eggs/
 dist/
 downloads/
 eggs/
@@ -16,69 +21,209 @@ parts/
 sdist/
 var/
 wheels/
+
+*.egg
 *.egg-info/
 .installed.cfg
-*.egg
+
+# =========================
 
 # Virtual Environment
+
+# =========================
+
 venv/
 env/
 ENV/
-.venv
+.venv/
+conda-env/
 
-# IDE
+# =========================
+
+# IDE / Editor
+
+# =========================
+
 .vscode/
 .idea/
+
 *.swp
 *.swo
 *~
 
-# Environment
+# =========================
+
+# Environment Variables
+
+# =========================
+
 .env
 .env.local
 .env.*.local
 
+# Keep template files
+
+!.env.example
+
+# =========================
+
 # Testing
+
+# =========================
+
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
-*.cover
+
+# =========================
 
 # Jupyter
-.ipynb_checkpoints/
-*.ipynb
 
-# Database
-*.db
-*.sqlite3
+# =========================
+
+.ipynb_checkpoints/
+
+# =========================
 
 # Logs
+
+# =========================
+
 *.log
 logs/
 
-# OS
+# =========================
+
+# Database
+
+# =========================
+
+*.db
+*.sqlite3
+
+# =========================
+
+# Cache
+
+# =========================
+
+.cache/
+*.cache
+
+# Python cache
+
+.pyre/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+
+# Frontend (React / Vite)
+
+# =========================
+
+node_modules/
+
+.next/
+.nuxt/
+
+dist/
+build/
+
+*.tsbuildinfo
+
+# Vite cache
+
+.vite/
+
+# =========================
+
+# AI / ML / Data
+
+# =========================
+
+# Ignore ALL datasets
+
+datasets/
+
+# Experiment outputs
+
+experiments/
+outputs/
+runs/
+checkpoints/
+
+# Embeddings
+
+embeddings/
+vectorstore/
+chroma/
+faiss/
+
+# Model weights
+
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.bin
+*.safetensors
+
+# Large data formats
+
+*.parquet
+
+# =========================
+
+# Docker
+
+# =========================
+
+docker-compose.override.yml
+
+# =========================
+
+# Linux / macOS / Windows
+
+# =========================
+
 .DS_Store
 Thumbs.db
 
-# Docker
-docker-compose.override.yml
+# =========================
 
-# Frontend
-node_modules/
-.next/
-out/
-dist/
-*.tsbuildinfo
+# Downloads / Installers
 
-# Data
-datasets/private/
-experiments/results/
-*.csv
-*.parquet
+# =========================
 
-# Cache
-.cache/
-*.cache
 Miniconda3-latest-Linux-x86_64.sh
 
+# =========================
+
+# Local Development Folders
+
+# =========================
+
 narrativeos/
+
+# =========================
+
+# VS Code Remote Server
+
+# =========================
+
+.vscode-server/
+
+# =========================
+
+# Temporary Files
+
+# =========================
+
+tmp/
+temp/
+
+*.tmp
+*.bak
+*.orig

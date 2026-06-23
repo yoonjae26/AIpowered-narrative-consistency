@@ -35,6 +35,25 @@ make dev
 make test
 ```
 
+## Demo (One Command)
+
+Run the full demo stack (LLM + backend + frontend) with GPU 3:
+
+```bash
+./scripts/start_demo.sh
+```
+
+Stop the full demo stack:
+
+```bash
+./scripts/stop_demo.sh
+```
+
+Endpoints:
+- Demo UI: http://127.0.0.1:4173
+- Backend API: http://127.0.0.1:8001
+- LLM API: http://127.0.0.1:11434/v1
+
 ## Tech Stack
 
 ### Backend

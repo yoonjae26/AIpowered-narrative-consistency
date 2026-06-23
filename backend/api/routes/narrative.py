@@ -1,6 +1,10 @@
-from datetime import datetime
+import json
+import re
+from datetime import datetime, UTC
+from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, status
+from jose.jwt import UTC
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -11,12 +15,76 @@ from backend.database.repositories.lore_repository import LoreRepository
 from backend.database.repositories.relationship_repository import RelationshipRepository
 from backend.database.repositories.scene_repository import SceneRepository
 from backend.database.repositories.timeline_repository import TimelineRepository
-from backend.narrative.character.models import CharacterState, CharacterUpdate
+from backend.core.constants import CharacterRole
+from backend.narrative.character.models import CharacterPBKD, CharacterState, CharacterUpdate
+from backend.narrative.response_formatter import format_mutation_api_response
 from backend.narrative.relationships.relationship_types import RelationshipType
 from backend.narrative.state_engine import NarrativeStateMutationEngine
 
 
 router = APIRouter(prefix="/narrative", tags=["narrative"])
+
+
+def _normalize_character_role(role: object) -> CharacterRole:
+	value = str(role or "").strip().lower()
+	legacy_map = {
+		"hero": CharacterRole.PROTAGONIST,
+		"main": CharacterRole.PROTAGONIST,
+		"lead": CharacterRole.PROTAGONIST,
+		"villain": CharacterRole.ANTAGONIST,
+		"enemy": CharacterRole.ANTAGONIST,
+		"support": CharacterRole.SUPPORTING,
+		"sidekick": CharacterRole.SUPPORTING,
+		"minor": CharacterRole.EXTRA,
+		"background": CharacterRole.EXTRA,
+	}
+	if value in legacy_map:
+		return legacy_map[value]
+	try:
+		return CharacterRole(value)
+	except ValueError:
+		return CharacterRole.SUPPORTING
+
+
+def _normalize_pbkd(
+	traits: list[str] | None,
+	goals: list[str] | None,
+	metadata: dict[str, object] | None,
+) -> CharacterPBKD:
+	meta = metadata or {}
+	beliefs = [str(item) for item in (meta.get("beliefs") or [])]
+	knowledge = [str(item) for item in (meta.get("knowledge") or [])]
+	desires = [str(item) for item in (meta.get("desires") or goals or [])]
+	personality = [str(item) for item in (traits or [])]
+	return CharacterPBKD(
+		personality=personality,
+		beliefs=beliefs,
+		knowledge=knowledge,
+		desires=desires,
+	)
+
+
+def _merge_pbkd_to_fields(
+	traits: list[str] | None,
+	goals: list[str] | None,
+	metadata: dict[str, object] | None,
+	pbkd: CharacterPBKD | None,
+) -> tuple[list[str], list[str], dict[str, object]]:
+	meta = dict(metadata or {})
+	next_traits = list(traits or [])
+	next_goals = list(goals or [])
+	if pbkd is not None:
+		if pbkd.personality:
+			next_traits = list(pbkd.personality)
+		if pbkd.desires:
+			next_goals = list(pbkd.desires)
+		if pbkd.beliefs:
+			meta["beliefs"] = list(pbkd.beliefs)
+		if pbkd.knowledge:
+			meta["knowledge"] = list(pbkd.knowledge)
+		if pbkd.desires:
+			meta["desires"] = list(pbkd.desires)
+	return next_traits, next_goals, meta
 
 
 class LoreFactCreate(BaseModel):
@@ -76,6 +144,602 @@ class QueryRequest(BaseModel):
 	query: str
 
 
+class RewriteRequest(BaseModel):
+	source_text: str
+	scene_title: str | None = None
+	instructions: str | None = None
+	target_tone: str | None = None
+	max_length: int | None = Field(default=1200, ge=80, le=4000)
+	preserve_characters: bool = True
+	preserve_canon: bool = True
+	style_notes: list[str] = Field(default_factory=list)
+
+
+class StructuredAutoEditRequest(RewriteRequest):
+	max_issues: int = Field(default=3, ge=1, le=12)
+	candidates_per_issue: int = Field(default=3, ge=1, le=6)
+	auto_apply: bool = False
+	use_knowledge_graph_evidence: bool = True
+	strict_reverification: bool = True
+
+
+class StructuredPatch(BaseModel):
+	issue: str
+	location: str
+	replace: str
+	with_text: str = Field(alias="with")
+	rationale: str | None = None
+
+	model_config = {
+		"populate_by_name": True,
+	}
+
+
+class PatchDecision(BaseModel):
+	patch_id: str
+	action: Literal["accept", "reject", "edit"]
+	edited_with: str | None = None
+
+
+class StructuredPatchReviewRequest(RewriteRequest):
+	decisions: list[PatchDecision] = Field(default_factory=list)
+	patches: list[dict[str, object]] = Field(default_factory=list)
+	strict_reverification: bool = True
+
+
+def _fallback_rewrite_response(request: RewriteRequest, reason: str) -> dict[str, object]:
+	return {
+		"provider_used": None,
+		"reason": reason,
+		"rewritten_text": request.source_text,
+		"summary": "Fallback mode returned the original scene text unchanged.",
+		"suggestions": [
+			"Connect a configured LLM provider to enable automatic rewriting.",
+			"Use the instructions field to steer style, tone, or structure.",
+		],
+		"risk_notes": [],
+	}
+
+
+def _parse_rewrite_payload(content: str) -> dict[str, object]:
+	candidate = content.strip()
+	fenced = re.match(r"^```(?:json)?\s*(.*?)\s*```$", candidate, re.DOTALL | re.IGNORECASE)
+	if fenced:
+		candidate = fenced.group(1).strip()
+	else:
+		json_start = candidate.find("{")
+		json_end = candidate.rfind("}")
+		if 0 <= json_start < json_end:
+			candidate = candidate[json_start:json_end + 1]
+	try:
+		payload = json.loads(candidate)
+		if isinstance(payload, dict):
+			payload["rewritten_text"] = str(payload.get("rewritten_text") or payload.get("text") or "").strip()
+			payload["summary"] = str(payload.get("summary") or "").strip()
+			payload["suggestions"] = _as_string_list(payload.get("suggestions"))
+			payload["risk_notes"] = _as_string_list(payload.get("risk_notes"))
+			return payload
+	except Exception:
+		pass
+	return {
+		"rewritten_text": content.strip(),
+		"summary": "Model returned non-JSON output.",
+		"suggestions": [],
+		"risk_notes": ["Non-JSON model output was returned as-is."],
+	}
+
+
+def _as_string_list(value: object) -> list[str]:
+	if value is None:
+		return []
+	if isinstance(value, list):
+		return [str(item).strip() for item in value if str(item).strip()]
+	if isinstance(value, str):
+		text = value.strip()
+		return [text] if text else []
+	return [str(value).strip()] if str(value).strip() else []
+
+
+def _split_paragraphs(text: str) -> list[str]:
+	parts = [chunk.strip() for chunk in re.split(r"\n\s*\n", text.strip())]
+	return [part for part in parts if part]
+
+
+def _extract_knowledge_graph_evidence(text: str) -> list[dict[str, str]]:
+	triples: list[dict[str, str]] = []
+	patterns = [
+		(r"\b([A-Z][a-z]+)\s+loves\s+([A-Z][a-z]+)\b", "loves"),
+		(r"\b([A-Z][a-z]+)\s+hates\s+([A-Z][a-z]+)\b", "hates"),
+		(r"\b([A-Z][a-z]+)\s+fears\s+([A-Z][a-z]+)\b", "fears"),
+		(r"\b([A-Z][a-z]+)\s+trusts\s+([A-Z][a-z]+)\b", "trusts"),
+		(r"\b([A-Z][a-z]+)\s+betrays\s+([A-Z][a-z]+)\b", "betrays"),
+		(r"\b([A-Z][a-z]+)\s+protects\s+([A-Z][a-z]+)\b", "protects"),
+		(r"\b([A-Z][a-z]+)\s+lives in\s+([A-Z][a-z]+)\b", "lives_in"),
+		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*사랑", "loves"),
+		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*두려워", "fears"),
+		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*신뢰", "trusts"),
+		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*배신", "betrays"),
+	]
+	for pattern, relation in patterns:
+		for match in re.finditer(pattern, text):
+			triples.append({
+				"subject": match.group(1),
+				"relation": relation,
+				"object": match.group(2),
+				"evidence": match.group(0),
+			})
+	return triples
+
+
+def _extract_korean_names(text: str) -> set[str]:
+	return {match.group(1) for match in re.finditer(r"\b([가-힣]{2,6})(?:는|은|이|가)\b", text)}
+
+
+def _build_kg_reasoning_issues(paragraphs: list[str], triples: list[dict[str, str]]) -> list[dict[str, object]]:
+	issues: list[dict[str, object]] = []
+	conflicts = {
+		("loves", "hates"),
+		("hates", "loves"),
+		("trusts", "betrays"),
+		("betrays", "trusts"),
+	}
+	for left in triples:
+		for right in triples:
+			if left is right:
+				continue
+			if left["subject"] != right["subject"] or left["object"] != right["object"]:
+				continue
+			if (left["relation"], right["relation"]) not in conflicts:
+				continue
+			location = "paragraph_1"
+			for idx, paragraph in enumerate(paragraphs, start=1):
+				if left["evidence"] in paragraph or right["evidence"] in paragraph:
+					location = f"paragraph_{idx}"
+					break
+			issues.append({
+				"issue_id": f"issue_{location}_kg_{left['relation']}_{right['relation']}",
+				"issue": "Knowledge graph relation conflict",
+				"type": "kg_relation_conflict",
+				"location": location,
+				"severity": "warning",
+				"message": f"{left['subject']} has conflicting relations with {left['object']} ({left['relation']} vs {right['relation']}).",
+				"evidence": [
+					{"type": "kg_triple", "value": left},
+					{"type": "kg_triple", "value": right},
+				],
+				"reasoning": [
+					"Two opposite graph edges were extracted for the same subject-object pair.",
+					"A minimal local patch should align relation polarity with canonical trajectory.",
+				],
+				"replace_hint": left["evidence"],
+				"with_hint": right["evidence"],
+			})
+	return issues
+
+
+def _build_pbkd_recall_issues(paragraphs: list[str]) -> list[dict[str, object]]:
+	issues: list[dict[str, object]] = []
+	fear_patterns = [
+		r"([A-Z][a-z]+|[가-힣]{2,6})(?:는|은|이|가)?[^.\n]{0,30}(무서워|두려워|fears|afraid)",
+	]
+	action_markers = r"(아무런\s*망설임\s*없이|망설임\s*없이|without hesitation|immediately|곧바로|아무 생각 없이|뛰어들|돌진)"
+	water_markers = r"(바다|물|강|sea|water|river)"
+	fear_subjects: dict[str, int] = {}
+
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		for pattern in fear_patterns:
+			for match in re.finditer(pattern, paragraph, flags=re.IGNORECASE):
+				subject = match.group(1)
+				fear_subjects[subject] = idx
+
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		lowered = paragraph.lower()
+		for subject, first_idx in fear_subjects.items():
+			if idx <= first_idx:
+				continue
+			if subject not in paragraph:
+				continue
+			if re.search(action_markers, paragraph, re.IGNORECASE) and re.search(water_markers, lowered, re.IGNORECASE):
+				issues.append({
+					"issue_id": f"issue_{idx}_pbkd_{subject}",
+					"issue": "PBKD conflict",
+					"type": "pbkd_conflict",
+					"location": f"paragraph_{idx}",
+					"severity": "warning",
+					"message": f"{subject} shows abrupt behavior against established fear-related belief/state.",
+					"evidence": [
+						{"type": "pbkd_memory", "value": f"{subject} fear context established earlier."},
+						{"type": "paragraph_excerpt", "value": paragraph[:220]},
+					],
+					"reasoning": [
+						"Previous paragraph implies persistent fear/avoidance state.",
+						"Current paragraph action lacks transition phrase and creates PBKD drift.",
+					],
+					"replace_hint": "아무런 망설임 없이",
+					"with_hint": "두려움을 억누르며",
+				})
+	return issues
+
+
+def _build_timeline_recall_issues(paragraphs: list[str]) -> list[dict[str, object]]:
+	issues: list[dict[str, object]] = []
+	dead_markers = r"(dead|died|killed|죽었다|사망했다|이미 죽은)"
+	alive_markers = r"(alive|returned|walked in|speaks|살아있|멀쩡히|돌아왔다)"
+	names: set[str] = set()
+	for paragraph in paragraphs:
+		names.update(_extract_character_names(paragraph))
+		names.update(_extract_korean_names(paragraph))
+	dead_by_name: dict[str, int] = {}
+
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		for name in names:
+			if name in paragraph and re.search(dead_markers, paragraph, flags=re.IGNORECASE):
+				dead_by_name[name] = idx
+
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		for name, dead_idx in dead_by_name.items():
+			if idx <= dead_idx:
+				continue
+			if name in paragraph and re.search(alive_markers, paragraph, flags=re.IGNORECASE):
+				issues.append({
+					"issue_id": f"issue_{idx}_timeline_{name}",
+					"issue": "Timeline contradiction",
+					"type": "timeline_conflict",
+					"location": f"paragraph_{idx}",
+					"severity": "warning",
+					"message": f"{name} appears alive after being established as dead without timeline bridge.",
+					"evidence": [
+						{"type": "timeline_state", "value": f"{name} marked dead in paragraph_{dead_idx}"},
+						{"type": "paragraph_excerpt", "value": paragraph[:220]},
+					],
+					"reasoning": [
+						"Character life-state changed across timeline without explicit resurrection/flashback framing.",
+						"Needs disambiguation patch for chronology or scene framing.",
+					],
+					"replace_hint": "alive",
+					"with_hint": "as a memory or flashback",
+				})
+	return issues
+
+
+def _build_canon_recall_issues(paragraphs: list[str], preserve_canon: bool) -> list[dict[str, object]]:
+	if not preserve_canon:
+		return []
+	issues: list[dict[str, object]] = []
+	forbidden_markers = r"(forbidden|금지|cannot|절대\s*할\s*수\s*없|규율상\s*금지)"
+	violation_markers = r"(did anyway|강행|행했다|without consequence|아무런 대가 없이)"
+	rule_paragraphs: list[tuple[int, str]] = []
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		if re.search(forbidden_markers, paragraph, flags=re.IGNORECASE):
+			rule_paragraphs.append((idx, paragraph))
+
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		for rule_idx, rule_text in rule_paragraphs:
+			if idx <= rule_idx:
+				continue
+			if re.search(violation_markers, paragraph, flags=re.IGNORECASE):
+				issues.append({
+					"issue_id": f"issue_{idx}_canon_rule_{rule_idx}",
+					"issue": "Canon rule violation",
+					"type": "canon_conflict",
+					"location": f"paragraph_{idx}",
+					"severity": "warning",
+					"message": "Scene violates an earlier explicit canon prohibition.",
+					"evidence": [
+						{"type": "canon_rule", "value": rule_text[:220]},
+						{"type": "paragraph_excerpt", "value": paragraph[:220]},
+					],
+					"reasoning": [
+						"Earlier paragraph established explicit prohibition.",
+						"Later paragraph indicates direct violation without bridge/override context.",
+					],
+					"replace_hint": "without consequence",
+					"with_hint": "with severe consequences",
+				})
+	return issues
+
+
+def _verifier_issues(request: StructuredAutoEditRequest) -> list[dict[str, object]]:
+	from backend.api.routes.consistency import _check_for_simple_conflicts
+
+	paragraphs = _split_paragraphs(request.source_text)
+	kg_triples = _extract_knowledge_graph_evidence(request.source_text) if request.use_knowledge_graph_evidence else []
+	issues: list[dict[str, object]] = []
+
+	for idx, paragraph in enumerate(paragraphs, start=1):
+		lowered = paragraph.lower()
+		local_evidence = [
+			{"type": "paragraph_excerpt", "value": paragraph[:220]},
+		]
+		for triple in kg_triples:
+			if triple["subject"].lower() in lowered or triple["object"].lower() in lowered:
+				local_evidence.append({"type": "kg_triple", "value": triple})
+		if "always" in lowered and "never" in lowered:
+			issues.append({
+				"issue_id": f"issue_{idx}_logic",
+				"issue": "Absolute contradiction",
+				"type": "logic_conflict",
+				"location": f"paragraph_{idx}",
+				"severity": "warning",
+				"message": "Paragraph contains both 'always' and 'never'.",
+				"evidence": local_evidence,
+				"reasoning": [
+					"Detected contradictory absolutes in a single local context.",
+					"Targeted lexical replacement can preserve voice while removing contradiction.",
+				],
+				"replace_hint": "always",
+				"with_hint": "often",
+			})
+		if request.preserve_canon and re.search(r"\b(resurrect|resurrection|back to life|bring[s]? .* back)\b", lowered):
+			issues.append({
+				"issue_id": f"issue_{idx}_canon",
+				"issue": "Canon conflict",
+				"type": "canon_conflict",
+				"location": f"paragraph_{idx}",
+				"severity": "warning",
+				"message": "Potential resurrection event while canon preservation is enabled.",
+				"evidence": local_evidence,
+				"reasoning": [
+					"Resurrection-like phrase detected while preserve_canon is enabled.",
+					"Prefer reinterpretation patch over global rewrite.",
+				],
+				"replace_hint": "back to life",
+				"with_hint": "through memory, not literal resurrection",
+			})
+
+	issues.extend(_build_pbkd_recall_issues(paragraphs))
+	issues.extend(_build_canon_recall_issues(paragraphs, preserve_canon=request.preserve_canon))
+	issues.extend(_build_timeline_recall_issues(paragraphs))
+	if request.use_knowledge_graph_evidence:
+		issues.extend(_build_kg_reasoning_issues(paragraphs, kg_triples))
+
+	baseline = _check_for_simple_conflicts(request.source_text, [])
+	for baseline_index, conflict in enumerate(baseline, start=1):
+		issues.append({
+			"issue_id": f"issue_baseline_{baseline_index}",
+			"issue": "Consistency warning",
+			"type": conflict.code,
+			"location": "paragraph_1",
+			"severity": str(conflict.severity.value),
+			"message": conflict.message,
+			"evidence": [{"type": "baseline_rule", "value": conflict.message}],
+			"reasoning": ["Baseline consistency route flagged a warning."],
+			"replace_hint": "",
+			"with_hint": "",
+		})
+
+	seen: set[tuple[str, str]] = set()
+	deduped: list[dict[str, object]] = []
+	for item in issues:
+		key = (str(item.get("issue")), str(item.get("location")))
+		if key in seen:
+			continue
+		seen.add(key)
+		deduped.append(item)
+	return deduped[:request.max_issues]
+
+
+def _extract_character_names(text: str) -> set[str]:
+	english = {match.group(0) for match in re.finditer(r"\b[A-Z][a-z]+\b", text)}
+	korean = {match.group(0) for match in re.finditer(r"\b[가-힣]{2,6}\b", text)}
+	return english.union(korean)
+
+
+def _find_issue(issues: list[dict[str, object]], issue_type: str, location: str) -> bool:
+	for issue in issues:
+		if str(issue.get("type")) == issue_type and str(issue.get("location")) == location:
+			return True
+	return False
+
+
+def _score_patch_candidate(
+	request: StructuredAutoEditRequest,
+	issue: dict[str, object],
+	patch: dict[str, str],
+	baseline_issue_count: int,
+) -> dict[str, object]:
+	patched_text, applied = _apply_structured_patches(request.source_text, [patch])
+	applied_ok = bool(applied and applied[0].get("applied"))
+	if not applied_ok:
+		return {
+			"total": 0.0,
+			"consistency": 0.0,
+			"canon": 0.0,
+			"pbkd": 0.0,
+			"style": 0.0,
+			"reverification": {
+				"accepted": False,
+				"reason": applied[0].get("reason") if applied else "Patch could not be applied.",
+				"issues_after": [],
+			},
+		}
+
+	verify_request = request.model_copy(update={"source_text": patched_text, "max_issues": max(12, request.max_issues)})
+	issues_after = _verifier_issues(verify_request)
+	issue_type = str(issue.get("type") or "")
+	issue_location = str(issue.get("location") or "")
+	resolved_target = not _find_issue(issues_after, issue_type=issue_type, location=issue_location)
+	new_issue_delta = max(0, len(issues_after) - max(0, baseline_issue_count - 1))
+
+	consistency_score = 1.0 if resolved_target else 0.25
+	if new_issue_delta > 0:
+		consistency_score = max(0.0, consistency_score - (0.2 * new_issue_delta))
+
+	if request.preserve_canon:
+		canon_conflicts = sum(1 for item in issues_after if str(item.get("type")) == "canon_conflict")
+		canon_score = 1.0 if canon_conflicts == 0 else max(0.0, 1.0 - (0.4 * canon_conflicts))
+	else:
+		canon_score = 1.0
+
+	original_names = _extract_character_names(request.source_text)
+	patched_names = _extract_character_names(patched_text)
+	if request.preserve_characters and original_names:
+		retained = len(original_names.intersection(patched_names)) / max(1, len(original_names))
+		pbkd_score = round(retained, 3)
+	else:
+		pbkd_score = 1.0
+
+	style_delta = abs(len(patched_text) - len(request.source_text)) / max(1, len(request.source_text))
+	style_score = max(0.0, 1.0 - min(1.0, style_delta * 4.0))
+
+	total = round((0.35 * consistency_score) + (0.25 * canon_score) + (0.2 * pbkd_score) + (0.2 * style_score), 4)
+	accepted = resolved_target and (new_issue_delta == 0 or not request.strict_reverification)
+	why_lines = [
+		f"Consistency score={consistency_score:.2f} (resolved_target={resolved_target}).",
+		f"Canon score={canon_score:.2f}.",
+		f"PBKD score={pbkd_score:.2f} based on retained named entities.",
+		f"Style score={style_score:.2f} from minimal length drift.",
+	]
+	if not accepted:
+		why_lines.append(f"Rejected by re-verification: new_issue_delta={new_issue_delta}.")
+
+	return {
+		"total": total,
+		"consistency": round(consistency_score, 4),
+		"canon": round(canon_score, 4),
+		"pbkd": round(pbkd_score, 4),
+		"style": round(style_score, 4),
+		"reverification": {
+			"accepted": accepted,
+			"reason": "Re-verification passed." if accepted else "Re-verification failed.",
+			"issues_after": issues_after,
+			"new_issue_delta": new_issue_delta,
+			"resolved_target": resolved_target,
+		},
+		"why_this_patch": " ".join(why_lines),
+	}
+
+
+def _parse_patch_candidate_payload(content: str) -> list[dict[str, str]]:
+	parsed = _parse_structured_patch_payload(content)
+	patches = parsed.get("patches") if isinstance(parsed.get("patches"), list) else []
+	results: list[dict[str, str]] = []
+	for patch in patches:
+		if not isinstance(patch, dict):
+			continue
+		results.append({
+			"replace": str(patch.get("replace") or ""),
+			"with": str(patch.get("with") or ""),
+			"rationale": str(patch.get("rationale") or "").strip(),
+		})
+	return results
+
+
+def _fallback_patch_candidates(issue: dict[str, object], count: int) -> list[dict[str, str]]:
+	replace_hint = str(issue.get("replace_hint") or "")
+	with_hint = str(issue.get("with_hint") or "")
+	if not replace_hint:
+		return []
+	variants = [with_hint, f"carefully {with_hint}".strip(), f"implicitly {with_hint}".strip()]
+	results: list[dict[str, str]] = []
+	for idx, candidate in enumerate(variants[:max(1, count)], start=1):
+		results.append({
+			"replace": replace_hint,
+			"with": candidate,
+			"rationale": f"Fallback candidate {idx} for {issue.get('issue', 'issue')}",
+		})
+	return results
+
+
+def _parse_structured_patch_payload(content: str) -> dict[str, object]:
+	candidate = content.strip()
+	fenced = re.match(r"^```(?:json)?\s*(.*?)\s*```$", candidate, re.DOTALL | re.IGNORECASE)
+	if fenced:
+		candidate = fenced.group(1).strip()
+	else:
+		json_start = candidate.find("{")
+		json_end = candidate.rfind("}")
+		if 0 <= json_start < json_end:
+			candidate = candidate[json_start:json_end + 1]
+
+	try:
+		payload = json.loads(candidate)
+		if not isinstance(payload, dict):
+			raise ValueError("Patch payload is not an object")
+		raw_patches = payload.get("patches") or []
+		if not isinstance(raw_patches, list):
+			raw_patches = []
+		patches: list[dict[str, str]] = []
+		for item in raw_patches:
+			if not isinstance(item, dict):
+				continue
+			parsed = StructuredPatch.model_validate(item)
+			patches.append({
+				"issue": parsed.issue,
+				"location": parsed.location,
+				"replace": parsed.replace,
+				"with": parsed.with_text,
+				"rationale": str(parsed.rationale or "").strip(),
+			})
+		return {
+			"summary": str(payload.get("summary") or "").strip(),
+			"risk_notes": _as_string_list(payload.get("risk_notes")),
+			"patches": patches,
+		}
+	except Exception:
+		return {
+			"summary": "Model returned invalid patch JSON.",
+			"risk_notes": ["Invalid JSON payload from model."],
+			"patches": [],
+		}
+
+
+def _apply_structured_patches(source_text: str, patches: list[dict[str, str]]) -> tuple[str, list[dict[str, object]]]:
+	paragraphs = _split_paragraphs(source_text)
+	if not paragraphs:
+		return source_text, []
+
+	applied: list[dict[str, object]] = []
+	for patch in patches:
+		location = str(patch.get("location") or "")
+		match = re.match(r"^paragraph_(\d+)$", location)
+		if not match:
+			applied.append({
+				"patch": patch,
+				"applied": False,
+				"reason": "Invalid location format; expected paragraph_N.",
+			})
+			continue
+
+		index = int(match.group(1)) - 1
+		if index < 0 or index >= len(paragraphs):
+			applied.append({
+				"patch": patch,
+				"applied": False,
+				"reason": "Location out of range.",
+			})
+			continue
+
+		replace_text = str(patch.get("replace") or "")
+		with_text = str(patch.get("with") or "")
+		paragraph = paragraphs[index]
+
+		if not replace_text:
+			applied.append({
+				"patch": patch,
+				"applied": False,
+				"reason": "Patch replace text is empty.",
+			})
+			continue
+
+		if replace_text not in paragraph:
+			applied.append({
+				"patch": patch,
+				"applied": False,
+				"reason": "Replace text not found in target paragraph.",
+			})
+			continue
+
+		paragraphs[index] = paragraph.replace(replace_text, with_text, 1)
+		applied.append({
+			"patch": patch,
+			"applied": True,
+			"reason": "ok",
+		})
+
+	return "\n\n".join(paragraphs), applied
+
+
 def get_state_engine(db: Session = Depends(get_db)) -> NarrativeStateMutationEngine:
 	from backend.llm.providers import create_llm_provider
 	try:
@@ -83,12 +747,13 @@ def get_state_engine(db: Session = Depends(get_db)) -> NarrativeStateMutationEng
 	except Exception:
 		llm_provider = None
 	repositories = {
+		"db": db,
 		"canon": CanonRepository(db),
-		"character": CharacterRepository(db),
+		"character": CharacterRepository(db, commit_on_write=False),
 		"lore": LoreRepository(db),
-		"relationship": RelationshipRepository(db),
-		"scene": SceneRepository(db),
-		"timeline": TimelineRepository(db),
+		"relationship": RelationshipRepository(db, commit_on_write=False),
+		"scene": SceneRepository(db, commit_on_write=False),
+		"timeline": TimelineRepository(db, commit_on_write=False),
 	}
 	return NarrativeStateMutationEngine(repositories, llm_provider=llm_provider)
 
@@ -106,7 +771,8 @@ def process_scene_input(
 	ctx = dict(input.context)
 	if input.scene_title:
 		ctx["scene_title"] = input.scene_title
-	return state_engine.process_scene(input.scene_text, ctx)
+	runtime_result = state_engine.process_scene(input.scene_text, ctx)
+	return format_mutation_api_response(runtime_result)
 
 
 @router.post("/version-control/branches")
@@ -213,6 +879,283 @@ def query_story(
 	return state_engine.query(request.query)
 
 
+@router.post("/rewrite")
+def rewrite_scene_text(request: RewriteRequest) -> dict[str, object]:
+	from backend.llm.providers import create_llm_provider
+	try:
+		provider = create_llm_provider()
+	except Exception as exc:
+		return _fallback_rewrite_response(request, reason=str(exc))
+
+	prompt = "\n".join([
+		"Rewrite the following narrative scene for clarity, rhythm, and authorial control.",
+		"Return ONLY valid JSON with keys: rewritten_text, summary, suggestions, risk_notes.",
+		"Keep canon, named characters, and factual events stable unless instructions explicitly request a change.",
+		f"Scene title: {request.scene_title or 'Untitled'}",
+		f"Target tone: {request.target_tone or 'balanced'}",
+		f"Max length: {request.max_length or 1200}",
+		f"Preserve characters: {request.preserve_characters}",
+		f"Preserve canon: {request.preserve_canon}",
+		f"Style notes: {', '.join(request.style_notes) if request.style_notes else 'none'}",
+		f"Instructions: {request.instructions or 'none'}",
+		"",
+		"Source text:",
+		request.source_text,
+	])
+
+	from backend.llm.providers.base import LLMMessage
+	try:
+		response = provider.complete([
+			LLMMessage(role="system", content="You are a precise narrative editor."),
+			LLMMessage(role="user", content=prompt),
+		])
+		payload = _parse_rewrite_payload(response.content)
+		payload.setdefault("provider_used", getattr(provider, "name", "llm"))
+		payload.setdefault("reason", "")
+		payload.setdefault("suggestions", [])
+		payload.setdefault("risk_notes", [])
+		return payload
+	except Exception as exc:
+		return _fallback_rewrite_response(request, reason=str(exc))
+
+
+@router.post("/rewrite/structured")
+def rewrite_scene_structured(request: StructuredAutoEditRequest) -> dict[str, object]:
+	issues = _verifier_issues(request)
+	if not issues:
+		return {
+			"provider_used": None,
+			"summary": "Verifier found no patchable issues.",
+			"knowledge_graph_evidence": _extract_knowledge_graph_evidence(request.source_text),
+			"issues": [],
+			"patches": [],
+			"ranked_candidates": [],
+			"selected_patches": [],
+			"applied_patches": [],
+			"patched_text_preview": request.source_text,
+			"patched_text": request.source_text,
+			"risk_notes": [],
+		}
+
+	from backend.llm.providers import create_llm_provider
+	from backend.llm.providers.base import LLMMessage
+
+	try:
+		provider = create_llm_provider()
+	except Exception as exc:
+		provider = None
+		provider_error = str(exc)
+	else:
+		provider_error = ""
+
+	kg_evidence = _extract_knowledge_graph_evidence(request.source_text) if request.use_knowledge_graph_evidence else []
+	baseline_count = len(issues)
+	ranked_candidates: list[dict[str, object]] = []
+	selected_patches: list[dict[str, object]] = []
+	risk_notes: list[str] = []
+	if provider_error:
+		risk_notes.append(provider_error)
+
+	for issue_index, issue in enumerate(issues, start=1):
+		issue_id = str(issue.get("issue_id") or f"issue_{issue_index}")
+		issue_candidates: list[dict[str, str]] = []
+
+		if provider is not None:
+			prompt = "\n".join([
+				"You are a narrative quick-fix engine.",
+				"Generate multiple candidate patches for ONE issue.",
+				"Return STRICT JSON with keys: summary, risk_notes, patches.",
+				"Each patch must include: issue, location, replace, with, rationale.",
+				f"Need exactly up to {request.candidates_per_issue} candidates.",
+				"Avoid broad rewrites; patch only local span.",
+				f"Issue: {json.dumps(issue, ensure_ascii=True)}",
+				"Source text:",
+				request.source_text,
+			])
+			try:
+				response = provider.complete([
+					LLMMessage(role="system", content="You generate 2-3 deterministic patch alternatives for one narrative issue."),
+					LLMMessage(role="user", content=prompt),
+				])
+				issue_candidates = _parse_patch_candidate_payload(response.content)
+			except Exception as exc:
+				risk_notes.append(f"Issue {issue_id}: {exc}")
+
+		if not issue_candidates:
+			issue_candidates = _fallback_patch_candidates(issue, request.candidates_per_issue)
+
+		scored_list: list[dict[str, object]] = []
+		for candidate_index, candidate in enumerate(issue_candidates[:request.candidates_per_issue], start=1):
+			patch_id = f"{issue_id}_cand_{candidate_index}"
+			patch_payload = {
+				"patch_id": patch_id,
+				"issue_id": issue_id,
+				"issue": str(issue.get("issue") or "Issue"),
+				"location": str(issue.get("location") or "paragraph_1"),
+				"replace": str(candidate.get("replace") or ""),
+				"with": str(candidate.get("with") or ""),
+				"rationale": str(candidate.get("rationale") or "").strip(),
+			}
+			score = _score_patch_candidate(request=request, issue=issue, patch=patch_payload, baseline_issue_count=baseline_count)
+			explainable_repair = {
+				"issue": issue.get("issue"),
+				"evidence": issue.get("evidence") or [],
+				"reasoning": issue.get("reasoning") or [],
+				"patch": {
+					"replace": patch_payload["replace"],
+					"with": patch_payload["with"],
+				},
+				"why_this_patch": score.get("why_this_patch") or "",
+			}
+			scored_list.append({
+				**patch_payload,
+				"scores": {
+					"total": score["total"],
+					"consistency": score["consistency"],
+					"canon": score["canon"],
+					"pbkd": score["pbkd"],
+					"style": score["style"],
+				},
+				"verification": score["reverification"],
+				"explainable_repair": explainable_repair,
+			})
+
+		scored_list.sort(key=lambda item: float(item.get("scores", {}).get("total", 0.0)), reverse=True)
+		selected = scored_list[0] if scored_list else None
+		ranked_candidates.append({
+			"issue_id": issue_id,
+			"issue": issue,
+			"candidates": scored_list,
+			"selected_patch_id": selected.get("patch_id") if isinstance(selected, dict) else None,
+		})
+		if isinstance(selected, dict):
+			selected_patches.append(selected)
+
+	preview_text = request.source_text
+	applied_patches: list[dict[str, object]] = []
+	for selected in selected_patches:
+		verification = selected.get("verification") if isinstance(selected, dict) else {}
+		accepted = bool(isinstance(verification, dict) and verification.get("accepted"))
+		if not accepted:
+			applied_patches.append({
+				"patch_id": selected.get("patch_id"),
+				"applied": False,
+				"reason": "Patch rejected by re-verification.",
+				"patch": selected,
+			})
+			continue
+
+		if request.auto_apply:
+			preview_text, apply_result = _apply_structured_patches(preview_text, [selected])
+			applied_patches.extend(apply_result)
+		else:
+			applied_patches.append({
+				"patch_id": selected.get("patch_id"),
+				"applied": False,
+				"reason": "Awaiting human review (manual mode).",
+				"patch": selected,
+			})
+
+	accepted_count = sum(1 for item in selected_patches if isinstance(item.get("verification"), dict) and item["verification"].get("accepted"))
+	return {
+		"provider_used": getattr(provider, "name", None),
+		"summary": "Structured auto-edit produced ranked patch candidates with re-verification.",
+		"knowledge_graph_evidence": kg_evidence,
+		"issues": issues,
+		"patches": selected_patches,
+		"ranked_candidates": ranked_candidates,
+		"selected_patches": selected_patches,
+		"accepted_candidate_count": accepted_count,
+		"applied_patches": applied_patches,
+		"patched_text_preview": preview_text,
+		"patched_text": preview_text if request.auto_apply else request.source_text,
+		"review_required": not request.auto_apply,
+		"review_endpoint": "/narrative/rewrite/structured/review",
+		"risk_notes": risk_notes,
+	}
+
+
+@router.post("/rewrite/structured/review")
+def review_structured_patches(request: StructuredPatchReviewRequest) -> dict[str, object]:
+	decision_map = {item.patch_id: item for item in request.decisions}
+	current_text = request.source_text
+	accepted: list[dict[str, object]] = []
+	rejected: list[dict[str, object]] = []
+	risk_notes: list[str] = []
+
+	seed_request = StructuredAutoEditRequest(
+		source_text=current_text,
+		scene_title=request.scene_title,
+		instructions=request.instructions,
+		target_tone=request.target_tone,
+		max_length=request.max_length,
+		preserve_characters=request.preserve_characters,
+		preserve_canon=request.preserve_canon,
+		style_notes=request.style_notes,
+		strict_reverification=request.strict_reverification,
+	)
+
+	for index, raw_patch in enumerate(request.patches, start=1):
+		patch_id = str(raw_patch.get("patch_id") or f"patch_{index}")
+		decision = decision_map.get(patch_id)
+		if decision is None:
+			rejected.append({"patch_id": patch_id, "reason": "No decision provided.", "patch": raw_patch})
+			continue
+
+		if decision.action == "reject":
+			rejected.append({"patch_id": patch_id, "reason": "Rejected by human.", "patch": raw_patch})
+			continue
+
+		candidate = dict(raw_patch)
+		if decision.action == "edit":
+			edited_with = str(decision.edited_with or "").strip()
+			if not edited_with:
+				rejected.append({"patch_id": patch_id, "reason": "Edit action missing edited_with text.", "patch": raw_patch})
+				continue
+			candidate["with"] = edited_with
+
+		issue = {
+			"type": str(candidate.get("issue_id") or candidate.get("issue") or "review_issue"),
+			"location": str(candidate.get("location") or "paragraph_1"),
+			"issue": str(candidate.get("issue") or "Issue"),
+		}
+		local_request = seed_request.model_copy(update={"source_text": current_text})
+		baseline_issues = _verifier_issues(local_request)
+		score = _score_patch_candidate(local_request, issue=issue, patch=candidate, baseline_issue_count=len(baseline_issues))
+		verification = score.get("reverification") if isinstance(score, dict) else {}
+		if isinstance(verification, dict) and verification.get("accepted"):
+			current_text, apply_result = _apply_structured_patches(current_text, [candidate])
+			accepted.append({
+				"patch_id": patch_id,
+				"decision": decision.action,
+				"verification": verification,
+				"apply_result": apply_result,
+				"patch": candidate,
+				"score": score,
+			})
+		else:
+			rejected.append({
+				"patch_id": patch_id,
+				"decision": decision.action,
+				"reason": "Patch failed re-verification.",
+				"verification": verification,
+				"patch": candidate,
+			})
+			risk_notes.append(f"Patch {patch_id} failed re-verification.")
+
+	final_request = seed_request.model_copy(update={"source_text": current_text})
+	final_issues = _verifier_issues(final_request)
+	return {
+		"summary": "Human-in-the-loop review completed.",
+		"accepted_patches": accepted,
+		"rejected_patches": rejected,
+		"final_issue_count": len(final_issues),
+		"final_issues": final_issues,
+		"patched_text": current_text,
+		"risk_notes": risk_notes,
+	}
+
+
 @router.get("/relationships/graph/{character_id}")
 def relationship_graph_summary(
 	character_id: str,
@@ -246,6 +1189,22 @@ def knowledge_graph_traverse(
 	return state_engine.knowledge_graph_traverse(node_id=node_id, depth=depth)
 
 
+@router.get("/debug/semantic-memory/histogram")
+def semantic_memory_histogram(
+	character_name: str | None = None,
+	bucket_size: float = 0.1,
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.semantic_memory_histogram(character_name=character_name, bucket_size=bucket_size)
+
+
+@router.post("/debug/semantic-memory/promotion")
+def run_semantic_memory_promotion(
+	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
+) -> dict[str, object]:
+	return state_engine.run_semantic_promotion_job()
+
+
 @router.get("/summary")
 def summary(db: Session = Depends(get_db)) -> dict[str, object]:
 	characters = CharacterRepository(db)
@@ -265,22 +1224,29 @@ def summary(db: Session = Depends(get_db)) -> dict[str, object]:
 @router.post("/characters", response_model=CharacterState, status_code=status.HTTP_201_CREATED)
 def create_character(request: CharacterState, db: Session = Depends(get_db)) -> CharacterState:
 	repo = CharacterRepository(db)
+	traits, goals, metadata = _merge_pbkd_to_fields(
+		traits=request.traits,
+		goals=request.goals,
+		metadata=request.metadata,
+		pbkd=request.pbkd,
+	)
 	character = repo.create(
 		character_id=request.id,
 		name=request.name,
 		role=request.role.value,
-		traits=request.traits,
-		goals=request.goals,
+		traits=traits,
+		goals=goals,
 		background=request.background,
 		status=request.status,
-		metadata=request.metadata,
+		metadata=metadata,
 	)
 	return CharacterState(
 		id=character.id,
 		name=character.name,
-		role=character.role,
+		role=_normalize_character_role(character.role),
 		traits=character.traits,
 		goals=character.goals,
+		pbkd=_normalize_pbkd(character.traits, character.goals, character.metadata_json),
 		background=character.background,
 		status=character.status,
 		metadata=character.metadata_json,
@@ -292,16 +1258,39 @@ def create_character(request: CharacterState, db: Session = Depends(get_db)) -> 
 @router.patch("/characters/{character_id}", response_model=CharacterState)
 def update_character(character_id: str, request: CharacterUpdate, db: Session = Depends(get_db)) -> CharacterState:
 	repo = CharacterRepository(db)
+	existing = repo.get(character_id)
+	if existing is None:
+		existing_traits: list[str] = []
+		existing_goals: list[str] = []
+		existing_metadata: dict[str, object] = {}
+	else:
+		existing_traits = list(existing.traits)
+		existing_goals = list(existing.goals)
+		existing_metadata = dict(existing.metadata_json or {})
+
 	patch = request.model_dump(exclude_unset=True)
 	if "role" in patch and patch["role"] is not None:
 		patch["role"] = patch["role"].value
+	pbkd_update = patch.pop("pbkd", None)
+	if pbkd_update is not None:
+		pbkd_obj = CharacterPBKD.model_validate(pbkd_update)
+		next_traits, next_goals, next_meta = _merge_pbkd_to_fields(
+			traits=patch.get("traits", existing_traits),
+			goals=patch.get("goals", existing_goals),
+			metadata=patch.get("metadata", existing_metadata),
+			pbkd=pbkd_obj,
+		)
+		patch["traits"] = next_traits
+		patch["goals"] = next_goals
+		patch["metadata"] = next_meta
 	character = repo.upsert(character_id, patch)
 	return CharacterState(
 		id=character.id,
 		name=character.name,
-		role=character.role,
+		role=_normalize_character_role(character.role),
 		traits=character.traits,
 		goals=character.goals,
+		pbkd=_normalize_pbkd(character.traits, character.goals, character.metadata_json),
 		background=character.background,
 		status=character.status,
 		metadata=character.metadata_json,
@@ -317,9 +1306,10 @@ def list_characters(db: Session = Depends(get_db)) -> list[CharacterState]:
 		CharacterState(
 			id=item.id,
 			name=item.name,
-			role=item.role,
+			role=_normalize_character_role(item.role),
 			traits=item.traits,
 			goals=item.goals,
+			pbkd=_normalize_pbkd(item.traits, item.goals, item.metadata_json),
 			background=item.background,
 			status=item.status,
 			metadata=item.metadata_json,
@@ -328,6 +1318,65 @@ def list_characters(db: Session = Depends(get_db)) -> list[CharacterState]:
 		)
 		for item in repo.list()
 	]
+
+
+@router.get("/characters/{character_id}/pbkd", response_model=CharacterPBKD)
+def get_character_pbkd(character_id: str, db: Session = Depends(get_db)) -> CharacterPBKD:
+	repo = CharacterRepository(db)
+	item = repo.get(character_id)
+	if item is None:
+		return CharacterPBKD()
+	return _normalize_pbkd(item.traits, item.goals, item.metadata_json)
+
+
+@router.get("/characters/pbkd/search")
+def search_character_pbkd(
+	query: str,
+	scopes: str = "P,B,K,D",
+	db: Session = Depends(get_db),
+) -> dict[str, object]:
+	repo = CharacterRepository(db)
+	q = query.strip().lower()
+	scope_map = {
+		"P": "personality",
+		"B": "beliefs",
+		"K": "knowledge",
+		"D": "desires",
+	}
+	allowed = {scope_map.get(part.strip().upper(), "") for part in scopes.split(",")}
+	allowed.discard("")
+	results: list[dict[str, object]] = []
+	for item in repo.list():
+		pbkd = _normalize_pbkd(item.traits, item.goals, item.metadata_json)
+		matches: dict[str, list[str]] = {}
+		if "personality" in allowed:
+			values = [v for v in pbkd.personality if q in v.lower()]
+			if values:
+				matches["P"] = values
+		if "beliefs" in allowed:
+			values = [v for v in pbkd.beliefs if q in v.lower()]
+			if values:
+				matches["B"] = values
+		if "knowledge" in allowed:
+			values = [v for v in pbkd.knowledge if q in v.lower()]
+			if values:
+				matches["K"] = values
+		if "desires" in allowed:
+			values = [v for v in pbkd.desires if q in v.lower()]
+			if values:
+				matches["D"] = values
+		if matches:
+			results.append({
+				"character_id": item.id,
+				"name": item.name,
+				"matches": matches,
+			})
+	return {
+		"query": query,
+		"scopes": [s.strip().upper() for s in scopes.split(",") if s.strip()],
+		"count": len(results),
+		"results": results,
+	}
 
 
 @router.post("/scenes", response_model=dict[str, object], status_code=status.HTTP_201_CREATED)
@@ -376,7 +1425,7 @@ def list_lore_facts(db: Session = Depends(get_db)) -> list[dict[str, object]]:
 @router.post("/timeline/events")
 def add_timeline_event(request: TimelineEventCreate, db: Session = Depends(get_db)) -> dict[str, object]:
 	repo = TimelineRepository(db)
-	event = repo.create(title=request.title, description=request.description, happened_at=request.happened_at or datetime.utcnow())
+	event = repo.create(title=request.title, description=request.description, happened_at=request.happened_at or datetime.now(UTC))
 	return {
 		"id": event.id,
 		"title": event.title,

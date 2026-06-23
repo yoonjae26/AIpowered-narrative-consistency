@@ -36,17 +36,21 @@ class RelationshipGraph:
 		)
 
 	def list_relationships(self, character_id: str | None = None) -> list[RelationshipEdge]:
-		return [
-			RelationshipEdge(
+		edges: list[RelationshipEdge] = []
+		for item in self.repository.list(character_id=character_id):
+			try:
+				rel_type = RelationshipType(item.relationship_type)
+			except ValueError:
+				rel_type = RelationshipType.ALLY  # fallback for legacy/invalid types
+			edges.append(RelationshipEdge(
 				source=item.source,
 				target=item.target,
-				relationship_type=RelationshipType(item.relationship_type),
+				relationship_type=rel_type,
 				strength=item.strength,
 				notes=item.notes,
-				dimensions=self._dimensions(RelationshipType(item.relationship_type), item.strength),
-			)
-			for item in self.repository.list(character_id=character_id)
-		]
+				dimensions=self._dimensions(rel_type, item.strength),
+			))
+		return edges
 
 	def relationship_between(self, source: str, target: str) -> RelationshipEdge | None:
 		for edge in self.list_relationships():

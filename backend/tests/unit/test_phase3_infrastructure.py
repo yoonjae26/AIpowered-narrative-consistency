@@ -313,3 +313,167 @@ def test_narrative_query_system_can_infer_location_from_scene_memory(tmp_path: P
     where_answer = query_system.query("Where is Anna?")
 
     assert "forest" in where_answer.answer.lower()
+
+
+def test_narrative_query_system_routes_korean_character_profile_query(tmp_path: Path) -> None:
+    character_repo = FakeCharacterRepo([
+        FakeCharacter(
+            id="char-1",
+            name="홍윤재",
+            metadata_json={
+                "memory": {
+                    "personality": ["충동적임"],
+                    "trait_events": [
+                        {
+                            "trait": "unstable",
+                            "surface": "미친",
+                            "confidence": 0.9,
+                            "source_scene": "초반 충돌",
+                            "timestamp": "2025-01-01T00:00:00+00:00",
+                        }
+                    ],
+                }
+            },
+        ),
+    ])
+    query_system = NarrativeQuerySystem(
+        character_repo=character_repo,
+        lore_repo=FakeListRepo([]),
+        scene_repo=FakeListRepo([]),
+        relationship_graph=RelationshipGraph(FakeRelationshipRepo()),
+        memory_service=NarrativeMemoryService(
+            scene_repo=FakeListRepo([]),
+            lore_repo=FakeListRepo([]),
+            character_repo=character_repo,
+            timeline_repo=FakeListRepo([]),
+            cache_path=tmp_path / "memory.json",
+        ),
+        event_store=EventStore(tmp_path / "events.jsonl"),
+    )
+
+    answer = query_system.query("홍윤재 어떤 사람이야?")
+
+    assert "홍윤재" in answer.answer
+    assert "unstable" in answer.answer
+
+
+def test_narrative_memory_search_applies_korean_normalization(tmp_path: Path) -> None:
+    character_repo = FakeCharacterRepo([
+        FakeCharacter(id="char-1", name="준호", metadata_json={"memory": {"personality": ["성격이 이상한"]}}),
+    ])
+    memory = NarrativeMemoryService(
+        scene_repo=FakeListRepo([
+            FakeScene(id="s1", title="장면", summary="준호는 성격이 이상한 사람이다."),
+        ]),
+        lore_repo=FakeListRepo([]),
+        character_repo=character_repo,
+        timeline_repo=FakeListRepo([]),
+        cache_path=tmp_path / "memory.json",
+    )
+    memory.rebuild_index()
+
+    hits = memory.search_hierarchy("준호 미친 는 성격", character_name="준호", limit=3)
+
+    assert hits
+    assert any("성격" in hit.content for hit in hits)
+
+
+def test_narrative_query_system_answers_korean_trait_who_query_from_character_memory(tmp_path: Path) -> None:
+    character_repo = FakeCharacterRepo([
+        FakeCharacter(
+            id="char-1",
+            name="현수",
+            metadata_json={
+                "memory": {
+                    "trait_events": [
+                        {
+                            "trait": "funny",
+                            "surface": "재밌",
+                            "relation": "has_trait",
+                            "confidence": 0.9,
+                            "source_scene": "장면1",
+                            "timestamp": "2026-01-01T00:00:00+00:00",
+                        }
+                    ],
+                    "pending_trait_events": [
+                        {
+                            "trait": "provisional:재밌는",
+                            "surface": "재밌는",
+                            "relation": "has_trait",
+                            "confidence": 0.46,
+                            "source_scene": "장면2",
+                            "timestamp": "2026-01-02T00:00:00+00:00",
+                        }
+                    ],
+                }
+            },
+        ),
+    ])
+    query_system = NarrativeQuerySystem(
+        character_repo=character_repo,
+        lore_repo=FakeListRepo([
+            FakeLoreFact(key="noise", value="completely unrelated lore text"),
+        ]),
+        scene_repo=FakeListRepo([]),
+        relationship_graph=RelationshipGraph(FakeRelationshipRepo()),
+        memory_service=NarrativeMemoryService(
+            scene_repo=FakeListRepo([]),
+            lore_repo=FakeListRepo([
+                FakeLoreFact(key="noise", value="completely unrelated lore text"),
+            ]),
+            character_repo=character_repo,
+            timeline_repo=FakeListRepo([]),
+            cache_path=tmp_path / "memory.json",
+        ),
+        event_store=EventStore(tmp_path / "events.jsonl"),
+    )
+
+    answer = query_system.query("재밌는 사람 누구야?")
+
+    assert "현수" in answer.answer
+    assert answer.evidence
+    assert answer.evidence[0]["character"] == "현수"
+    assert answer.evidence[0]["matches"][0]["trait"] in {"funny", "provisional:재밌는"}
+
+
+def test_narrative_query_system_answers_korean_trait_confirmation_query(tmp_path: Path) -> None:
+    character_repo = FakeCharacterRepo([
+        FakeCharacter(
+            id="char-1",
+            name="황링",
+            metadata_json={
+                "memory": {
+                    "trait_events": [
+                        {
+                            "trait": "bad",
+                            "surface": "나쁜",
+                            "relation": "has_trait",
+                            "confidence": 0.88,
+                            "source_scene": "장면1",
+                            "timestamp": "2026-01-01T00:00:00+00:00",
+                        }
+                    ]
+                }
+            },
+        ),
+    ])
+    query_system = NarrativeQuerySystem(
+        character_repo=character_repo,
+        lore_repo=FakeListRepo([]),
+        scene_repo=FakeListRepo([]),
+        relationship_graph=RelationshipGraph(FakeRelationshipRepo()),
+        memory_service=NarrativeMemoryService(
+            scene_repo=FakeListRepo([]),
+            lore_repo=FakeListRepo([]),
+            character_repo=character_repo,
+            timeline_repo=FakeListRepo([]),
+            cache_path=tmp_path / "memory.json",
+        ),
+        event_store=EventStore(tmp_path / "events.jsonl"),
+    )
+
+    answer = query_system.query("황링은 나쁜 사람맞아?")
+
+    assert "Yes" in answer.answer
+    assert answer.evidence
+    assert answer.evidence[0]["match_type"] == "permanent"

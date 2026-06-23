@@ -2,6 +2,8 @@ import { useRef } from "react";
 import { useNarrativeIde } from "../../hooks";
 import { CharacterPanel } from "../character-panel";
 import { ConsistencySidebar } from "../consistency-sidebar";
+import { GatePanel } from "../gate-panel";
+import { PBKDLab } from "../pbkd-lab";
 import { RelationshipGraph } from "../relationship-graph";
 import { TimelineView } from "../timeline-view";
 import { WorldPanel } from "../world-panel";
@@ -29,6 +31,8 @@ function ToolbarButton({ label, onClick }: { label: string; onClick: () => void 
 export function NarrativeEditor() {
 	const editorRef = useRef<HTMLDivElement | null>(null);
 	const ide = useNarrativeIde();
+	const timelineEvents = Array.isArray(ide.lastResult?.events) ? ide.lastResult.events : [];
+	const timelineConflicts = ide.lastResult?.timeline?.conflicts || [];
 
 	return (
 		<div
@@ -91,6 +95,8 @@ export function NarrativeEditor() {
 						fontSize: 13,
 					}}
 				/>
+
+				<GatePanel result={ide.lastResult} isRunning={ide.isRunning} />
 			</header>
 
 			<div
@@ -102,6 +108,7 @@ export function NarrativeEditor() {
 				}}
 			>
 				<div style={{ display: "grid", gap: 12 }}>
+					<PBKDLab />
 					<WorldPanel memory={ide.lastResult?.memory?.retrieved || null} />
 					<CharacterPanel characterState={ide.lastResult?.memory?.character_state || {}} />
 				</div>
@@ -165,8 +172,8 @@ export function NarrativeEditor() {
 					</section>
 
 					<TimelineView
-						events={ide.lastResult?.events || []}
-						conflicts={ide.lastResult?.timeline?.conflicts || []}
+						events={timelineEvents}
+						conflicts={timelineConflicts}
 					/>
 
 					<RelationshipGraph edges={ide.relationshipEdges} />

@@ -40,6 +40,10 @@ _STOPWORDS = {
     "what", "who", "which", "said", "asked", "replied",
 }
 
+_TEMPORAL_PREFIXES = {
+    "after", "before", "later", "then", "next", "meanwhile", "suddenly", "moments later",
+}
+
 
 def _is_valid_name(name: str) -> bool:
     stripped = name.strip().strip(".")
@@ -47,6 +51,34 @@ def _is_valid_name(name: str) -> bool:
             and name not in _PLACEHOLDER_NAMES
             and len(name) >= 2
             and name.lower() not in _STOPWORDS)
+
+
+def _normalize_entity_name(name: str) -> str:
+    normalized = re.sub(r"\s+", " ", name).strip(" .,!?:;\"'")
+    if not normalized:
+        return ""
+
+    lower = normalized.lower()
+    if lower in _TEMPORAL_PREFIXES:
+        return ""
+
+    for prefix in sorted(_TEMPORAL_PREFIXES, key=len, reverse=True):
+        token = f"{prefix} "
+        if lower.startswith(token):
+            normalized = normalized[len(token):].strip()
+            break
+
+    lowered = normalized.lower()
+    if lowered.startswith("the ") and len(normalized) > 4 and normalized[4:5].islower():
+        normalized = normalized[4:].strip()
+    elif lowered.startswith("an ") and len(normalized) > 3 and normalized[3:4].islower():
+        normalized = normalized[3:].strip()
+    elif lowered.startswith("a ") and len(normalized) > 2 and normalized[2:3].islower():
+        normalized = normalized[2:].strip()
+
+    if not normalized:
+        return ""
+    return normalized
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +185,7 @@ class EntityExtractor:
         existing_objects: set[str] = set()
 
         for match in _PROPER_NOUN_RE.finditer(text):
-            name = match.group(1)
+            name = _normalize_entity_name(match.group(1))
             if name in seen or not _is_valid_name(name):
                 continue
             seen.add(name)
@@ -285,25 +317,25 @@ class EntityExtractor:
 
         result = ExtractedEntities()
         for item in data.get("characters", []):
-            name = item.get("name", "").strip()
+            name = _normalize_entity_name(item.get("name", ""))
             if _is_valid_name(name):
                 result.characters.append(ExtractedEntity(
                     name=name, entity_type="character",
                     attributes=item.get("attributes", {}), confidence=0.9))
         for item in data.get("locations", []):
-            name = item.get("name", "").strip()
+            name = _normalize_entity_name(item.get("name", ""))
             if _is_valid_name(name):
                 result.locations.append(ExtractedEntity(
                     name=name, entity_type="location",
                     attributes=item.get("attributes", {}), confidence=0.9))
         for item in data.get("objects", []):
-            name = item.get("name", "").strip()
+            name = _normalize_entity_name(item.get("name", ""))
             if _is_valid_name(name):
                 result.objects.append(ExtractedEntity(
                     name=name, entity_type="object",
                     attributes=item.get("attributes", {}), confidence=0.9))
         for item in data.get("concepts", []):
-            name = item.get("name", "").strip()
+            name = _normalize_entity_name(item.get("name", ""))
             if _is_valid_name(name):
                 result.concepts.append(ExtractedEntity(
                     name=name, entity_type="concept",

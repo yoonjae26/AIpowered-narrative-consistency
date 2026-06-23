@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,8 +9,9 @@ from backend.database.models.character import Character
 
 
 class CharacterRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, commit_on_write: bool = True) -> None:
         self.db = db
+        self._commit_on_write = commit_on_write
 
     def list(self) -> list[Character]:
         stmt = select(Character).order_by(Character.created_at.asc())
@@ -44,7 +45,9 @@ class CharacterRepository:
             metadata_json=metadata,
         )
         self.db.add(character)
-        self.db.commit()
+        self.db.flush()
+        if self._commit_on_write:
+            self.db.commit()
         self.db.refresh(character)
         return character
 
@@ -56,8 +59,10 @@ class CharacterRepository:
             fields["metadata_json"] = fields.pop("metadata")
         for key, value in fields.items():
             setattr(character, key, value)
-        character.updated_at = datetime.utcnow()
+        character.updated_at = datetime.now(UTC)
         self.db.add(character)
-        self.db.commit()
+        self.db.flush()
+        if self._commit_on_write:
+            self.db.commit()
         self.db.refresh(character)
         return character

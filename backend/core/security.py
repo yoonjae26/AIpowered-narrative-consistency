@@ -1,30 +1,24 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import bcrypt as _bcrypt
 from jose import JWTError, jwt
 
 from backend.core.config import get_settings
 
-try:
-	from passlib.context import CryptContext
-except Exception:  # pragma: no cover - optional dependency fallback
-	CryptContext = None
-
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") if CryptContext else None
 _ALGORITHM = "HS256"
 
 
 def hash_password(password: str) -> str:
-	if _pwd_context is None:
-		raise RuntimeError("passlib is not available")
-	return _pwd_context.hash(password)
+	# passlib + bcrypt>=4 incompatible — use bcrypt directly
+	return _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-	if _pwd_context is None:
-		return plain_password == hashed_password
-	return _pwd_context.verify(plain_password, hashed_password)
+	try:
+		return _bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+	except Exception:
+		return False
 
 
 def _create_token(subject: str, token_type: str, expires_delta: timedelta, scopes: list[str] | None = None) -> str:

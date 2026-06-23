@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 from typing import Any
 
@@ -137,7 +137,9 @@ class NarrativeEvent:
     action: str | None = None          # raw verb (e.g. "killed")
     location: str | None = None        # scene location
     attributes: dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(
+    default_factory=lambda: datetime.now(UTC)
+)
     source_scene: str | None = None
     is_flashback: bool = False
 
@@ -149,5 +151,7 @@ class MutationResult:
     characters_upserted: list[str]    # list of IDs
     timeline_events_created: list[str]
     consistency_warnings: list[str]
+    upserted_entities: list[dict[str, str]] = field(default_factory=list)
+    character_upsert_attempts: int = 0
     success: bool = True
     error: str | None = None

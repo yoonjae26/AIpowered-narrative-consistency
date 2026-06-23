@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +36,8 @@ class FakeTimelineEvent:
     id: str
     title: str
     description: str | None = None
-    happened_at: datetime = field(default_factory=datetime.utcnow)
+    happened_at: datetime = field(
+    default_factory=lambda: datetime.now(UTC))
     metadata_json: dict[str, object] = field(default_factory=dict)
 
 
@@ -128,7 +129,7 @@ class FakeTimelineRepo:
             id=event_id or f"timeline-{len(self._items) + 1}",
             title=title or event_type or "timeline",
             description=description,
-            happened_at=timestamp or happened_at or datetime.utcnow(),
+            happened_at=timestamp or happened_at or datetime.now(UTC),
             metadata_json=dict(metadata or {}),
         )
         self._items.append(event)
@@ -260,21 +261,28 @@ def test_state_engine_process_scene_returns_phase4_outputs(tmp_path: Path) -> No
     snapshot_path = tmp_path / "snapshots.json"
     branch_path = tmp_path / "branches.json"
 
-    repositories = {
-        "canon": FakeCanonRepo(),
-        "character": FakeCharacterRepo([
-            FakeCharacter(
-                id="char-john",
-                name="John",
-                metadata_json={"memory": {"personality": ["emotion:joyful"], "beliefs": ["never kill"]}},
-            ),
-            FakeCharacter(id="char-mira", name="Mira"),
-        ]),
-        "lore": FakeLoreRepo([FakeLoreFact(key="oath", value="Betrayal is forbidden")]),
-        "relationship": FakeRelationshipRepo(),
-        "scene": FakeSceneRepo(),
-        "timeline": FakeTimelineRepo(),
-    }
+    repositories: dict[str, Any] = {
+    "canon": FakeCanonRepo(),
+    "character": FakeCharacterRepo([
+        FakeCharacter(
+            id="char-john",
+            name="John",
+            metadata_json={
+                "memory": {
+                    "personality": ["emotion:joyful"],
+                    "beliefs": []
+                }
+            },
+        ),
+        FakeCharacter(id="char-mira", name="Mira"),
+    ]),
+    "lore": FakeLoreRepo([
+        FakeLoreFact(key="oath", value="Betrayal is forbidden")
+    ]),
+    "relationship": FakeRelationshipRepo(),
+    "scene": FakeSceneRepo(),
+    "timeline": FakeTimelineRepo(),
+}
 
     engine = NarrativeStateMutationEngine(repositories, llm_provider=None)
     engine._memory._cache_path = cache_path

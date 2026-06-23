@@ -10,6 +10,7 @@ from backend.narrative.mutation.models import EventType
 class CriticAgent:
     def __init__(self, llm_provider: BaseLLMProvider | None = None) -> None:
         self._llm = llm_provider
+        self._confidence_threshold = 0.75
 
     def analyze(
         self,
@@ -48,8 +49,24 @@ class CriticAgent:
                     LLMMessage(role="system", content="You are a pacing critic for fiction scenes."),
                     LLMMessage(role="user", content=prompt),
                 ])
-                findings.extend(line.strip("- ") for line in response.content.splitlines() if line.strip())
+                for line in response.content.splitlines():
+                    candidate = line.strip("- *\t")
+                    if not candidate:
+                        continue
+                    if self._estimate_confidence(candidate) < self._confidence_threshold:
+                        continue
+                    findings.append(candidate)
             except Exception:
                 pass
 
         return list(dict.fromkeys(findings))
+
+    def _estimate_confidence(self, finding: str) -> float:
+        lowered = finding.lower()
+        if any(token in lowered for token in ("abrupt", "conflict", "forced", "unclear", "too quickly", "compressed")):
+            return 0.9
+        if any(token in lowered for token in ("may", "might", "possibly", "could", "perhaps")):
+            return 0.55
+        if len(finding.split()) > 32:
+            return 0.6
+        return 0.78

@@ -53,13 +53,51 @@ export interface RelationshipEdgeDTO {
 export interface NarrativeMutationResponse {
 	success: boolean;
 	error?: string;
+	decision?: "approve" | "reject" | "needs-override" | string;
 	scene_title?: string;
-	events?: NarrativeEventDTO[];
+	events?:
+		| NarrativeEventDTO[]
+		| {
+				count: number;
+				types: Record<string, number>;
+		  };
+	gate?: {
+		decision: "approve" | "reject" | "needs-override" | string;
+		approved: boolean;
+		allow_canon_override: boolean;
+		blocking_reason_count: number;
+		overrideable_reason_count: number;
+		non_overrideable_reason_count: number;
+		message: string;
+		summary: Record<string, unknown>;
+		blocking_reasons: string[];
+		overrideable_reasons: string[];
+		non_overrideable_reasons: string[];
+	};
+	preflight?: {
+		verification_scope?: Record<string, unknown>;
+		timeline?: {
+			valid: boolean;
+			conflicts_count: number;
+			flashback_count: number;
+			flash_forward_count: number;
+		};
+		consistency?: {
+			consistent: boolean;
+			warning_count: number;
+			error_count: number;
+		};
+		semantic_issue_count?: number;
+		drift_issue_count?: number;
+		canon_conflict_count?: number;
+		ontology_error_count?: number;
+	};
 	timeline?: {
 		valid: boolean;
 		flashback_count: number;
 		flash_forward_count: number;
-		conflicts: string[];
+		conflicts?: string[];
+		conflicts_count?: number;
 		entries_count: number;
 	};
 	consistency?: {
@@ -157,6 +195,29 @@ export function toSeverity(raw: string): IssueSeverity {
 export function buildIssuesFromMutation(payload: NarrativeMutationResponse): NarrativeIssue[] {
 	const issues: NarrativeIssue[] = [];
 	const now = Date.now();
+	const gateDecision = payload.gate?.decision || payload.decision;
+
+	for (const message of payload.gate?.blocking_reasons || []) {
+		issues.push({
+			id: `gate-blocking-${now}-${issues.length}`,
+			severity: gateDecision === "needs-override" ? "warning" : "error",
+			code: "pre_persist_gate",
+			message,
+			source: "consistency",
+			scene: payload.scene_title,
+		});
+	}
+
+	for (const message of payload.gate?.overrideable_reasons || []) {
+		issues.push({
+			id: `gate-override-${now}-${issues.length}`,
+			severity: "warning",
+			code: "pre_persist_override_needed",
+			message,
+			source: "canon",
+			scene: payload.scene_title,
+		});
+	}
 
 	for (const warning of payload.writer_warnings || []) {
 		issues.push({
@@ -214,6 +275,28 @@ export function buildIssuesFromMutation(payload: NarrativeMutationResponse): Nar
 			message: issue.message,
 			entities: [issue.character],
 			source: "drift",
+			scene: payload.scene_title,
+		});
+	}
+
+	if ((payload.preflight?.consistency?.error_count || 0) > 0) {
+		issues.push({
+			id: `preflight-consistency-${now}-${issues.length}`,
+			severity: "error",
+			code: "preflight_consistency_error_count",
+			message: `Preflight consistency errors: ${payload.preflight?.consistency?.error_count}`,
+			source: "consistency",
+			scene: payload.scene_title,
+		});
+	}
+
+	if ((payload.preflight?.semantic_issue_count || 0) > 0) {
+		issues.push({
+			id: `preflight-semantic-${now}-${issues.length}`,
+			severity: "warning",
+			code: "preflight_semantic_issue_count",
+			message: `Preflight semantic issues: ${payload.preflight?.semantic_issue_count}`,
+			source: "semantic",
 			scene: payload.scene_title,
 		});
 	}

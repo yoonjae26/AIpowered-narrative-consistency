@@ -10,9 +10,11 @@ class ProjectRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def list(self) -> list[Project]:
-        stmt = select(Project).order_by(Project.created_at.desc())
-        return list(self.db.scalars(stmt).all())
+    def list(self, owner_id: str | None = None) -> list[Project]:
+        stmt = select(Project)
+        if owner_id is not None:
+            stmt = stmt.where(Project.owner_id == owner_id)
+        return list(self.db.scalars(stmt.order_by(Project.created_at.desc())).all())
 
     def get(self, project_id: str) -> Project | None:
         return self.db.get(Project, project_id)
@@ -21,8 +23,8 @@ class ProjectRepository:
         stmt = select(Project).where(Project.title == title)
         return self.db.scalar(stmt)
 
-    def create(self, title: str, description: str | None = None, status: str = "draft") -> Project:
-        project = Project(title=title, description=description, status=status)
+    def create(self, title: str, owner_id: str, description: str | None = None, status: str = "draft") -> Project:
+        project = Project(title=title, owner_id=owner_id, description=description, status=status)
         self.db.add(project)
         self.db.commit()
         self.db.refresh(project)

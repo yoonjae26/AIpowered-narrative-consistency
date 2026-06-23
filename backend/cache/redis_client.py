@@ -40,9 +40,23 @@ class RedisClient:
 		if redis is None:
 			self._client = self._memory
 			return self._client
-		self._client = redis.Redis.from_url(self.url, decode_responses=self.decode_responses)
-		return self._client
 
+		try:
+			client = redis.Redis.from_url(
+				self.url,
+				decode_responses=self.decode_responses
+			)
+
+			# kiểm tra server có thực sự tồn tại không
+			client.ping()
+
+			self._client = client
+
+		except Exception:
+			# fallback sang cache trong RAM
+			self._client = self._memory
+
+		return self._client
 	@property
 	def client(self) -> Any:
 		if self._client is None:

@@ -9,6 +9,7 @@ from backend.database.repositories.character_repository import CharacterReposito
 from backend.database.repositories.lore_repository import LoreRepository
 from backend.database.repositories.scene_repository import SceneRepository
 from backend.database.repositories.timeline_repository import TimelineRepository
+from backend.narrative.korean_text import normalize_korean_text
 from backend.rag.embeddings.chunk_strategy import ChunkStrategy
 from backend.rag.embeddings.embedder import BaseEmbedder, HashEmbedder
 from backend.rag.retrieval.hybrid_search import HybridSearch
@@ -87,12 +88,51 @@ class NarrativeMemoryService:
         source_types: set[str] | None = None,
     ) -> list[NarrativeMemoryHit]:
         self.ensure_ready()
-        hits = self._search.search(query, limit=max(limit * 3, 10))
+        hits = self._search.search(normalize_korean_text(query), limit=max(limit * 3, 10))
         ranked = [self._convert_hit(hit) for hit in hits]
         if source_types:
             ranked = [hit for hit in ranked if hit.source_type in source_types]
         ranked.sort(key=self._rank_key, reverse=True)
         return ranked[:limit]
+
+    def search_hierarchy(
+        self,
+        query: str,
+        character_name: str | None = None,
+        limit: int = 6,
+    ) -> list[NarrativeMemoryHit]:
+        collected: list[NarrativeMemoryHit] = []
+        phases = [
+            {"scene"},
+            {"character"},
+            {"lore"},
+            {"event"},
+        ]
+
+        for source_types in phases:
+            hits = self.search(query, limit=max(limit, 6), source_types=source_types)
+            if character_name and "character" in source_types:
+                hits = [
+                    hit
+                    for hit in hits
+                    if str(hit.metadata.get("name") or "").lower() == character_name.lower()
+                    or character_name.lower() in hit.content.lower()
+                ]
+            for hit in hits:
+                if any(existing.id == hit.id for existing in collected):
+                    continue
+                collected.append(hit)
+                if len(collected) >= limit:
+                    return collected
+
+        fallback = self.search(query, limit=max(limit, 6))
+        for hit in fallback:
+            if any(existing.id == hit.id for existing in collected):
+                continue
+            collected.append(hit)
+            if len(collected) >= limit:
+                break
+        return collected
 
     def build_context(
         self,
@@ -171,7 +211,7 @@ class NarrativeMemoryService:
         )
         self._search.index(
             f"scene:{scene.id}",
-            content,
+            normalize_korean_text(content),
             source_type="scene",
             title=scene.title,
             characters=scene.characters,
@@ -201,7 +241,7 @@ class NarrativeMemoryService:
         )
         self._search.index(
             f"character:{character.id}",
-            content,
+            normalize_korean_text(content),
             source_type="character",
             name=character.name,
             status=character.status,
@@ -221,7 +261,7 @@ class NarrativeMemoryService:
         )
         self._search.index(
             stable_id,
-            content,
+            normalize_korean_text(content),
             source_type="event",
             subject=getattr(event, "subject", None),
             target=getattr(event, "target", None),
@@ -238,7 +278,7 @@ class NarrativeMemoryService:
             )
             self._search.index(
                 f"scene:{scene.id}",
-                content,
+                normalize_korean_text(content),
                 source_type="scene",
                 title=scene.title,
                 characters=scene.characters,
@@ -251,7 +291,7 @@ class NarrativeMemoryService:
             content = " ".join(filter(None, [fact.key, fact.value, fact.source or "", " ".join(fact.tags or [])]))
             self._search.index(
                 f"lore:{fact.key}",
-                content,
+                normalize_korean_text(content),
                 source_type="lore",
                 key=fact.key,
                 source=fact.source,
@@ -279,7 +319,7 @@ class NarrativeMemoryService:
             )
             self._search.index(
                 f"character:{character.id}",
-                content,
+                normalize_korean_text(content),
                 source_type="character",
                 name=character.name,
                 status=character.status,
@@ -293,7 +333,8 @@ class NarrativeMemoryService:
             content = " ".join(filter(None, [event.title, event.description or "", str(meta.get("location") or ""), str(meta)]))
             self._search.index(
                 f"event:{event.id}",
-                content,
+                normalize_korean_text(content),
                 source_type="event",
                 happened_at=event.happened_at.isoformat() if event.happened_at else None,
             )
+NarrativeMemory = NarrativeMemoryService

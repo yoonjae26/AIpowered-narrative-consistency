@@ -135,7 +135,7 @@ class StateMutator:
             status = _VITAL_STATUS_MAP[etype]
             char_id = self._upsert_character(event.subject, event.attributes, status=status,
                                              location=event.location)
-            result.characters_upserted.append(char_id)
+            self._record_character_upsert(result, char_id, event.subject)
             char_names_in_scene.append(event.subject)
 
         elif etype == EventType.CHARACTER_EXITS:
@@ -147,7 +147,7 @@ class StateMutator:
         elif etype == EventType.DEATH:
             # subject dies
             char_id = self._upsert_character(event.subject, {}, status=CharacterStatus.DEAD.value)
-            result.characters_upserted.append(char_id)
+            self._record_character_upsert(result, char_id, event.subject)
             tl_id = self._create_timeline_event(event)
             result.timeline_events_created.append(tl_id)
             return  # already added timeline
@@ -155,25 +155,25 @@ class StateMutator:
         elif etype == EventType.MURDER:
             # subject kills target -> target dies
             char_id = self._upsert_character(event.subject, {})  # killer unaffected
-            result.characters_upserted.append(char_id)
+            self._record_character_upsert(result, char_id, event.subject)
             if event.target:
                 victim_id = self._upsert_character(event.target, {}, status=CharacterStatus.DEAD.value)
-                result.characters_upserted.append(victim_id)
+                self._record_character_upsert(result, victim_id, event.target)
                 char_names_in_scene.extend([event.subject, event.target])
 
         elif etype == EventType.INJURY:
             if event.target:
                 victim_id = self._upsert_character(event.target, {}, status=CharacterStatus.INJURED.value)
-                result.characters_upserted.append(victim_id)
+                self._record_character_upsert(result, victim_id, event.target)
             char_id = self._upsert_character(event.subject, {})
-            result.characters_upserted.append(char_id)
+            self._record_character_upsert(result, char_id, event.subject)
 
         elif etype == EventType.TRAVEL:
             # Update last known location
             location_attrs = {"last_location": event.location} if event.location else {}
             char_id = self._upsert_character(event.subject, location_attrs,
                                              location=event.location)
-            result.characters_upserted.append(char_id)
+            self._record_character_upsert(result, char_id, event.subject)
 
         elif etype in _RELATIONSHIP_EVENTS:
             if event.target:
@@ -189,6 +189,15 @@ class StateMutator:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _record_character_upsert(self, result: MutationResult, character_id: str, name: str) -> None:
+        result.character_upsert_attempts += 1
+        if character_id not in result.characters_upserted:
+            result.characters_upserted.append(character_id)
+
+        normalized_name = name.strip()
+        if normalized_name and all(item.get("id") != character_id for item in result.upserted_entities):
+            result.upserted_entities.append({"id": character_id, "name": normalized_name})
 
     def _upsert_character(
         self,
@@ -246,7 +255,7 @@ class StateMutator:
             src_id = source_chars[0].id
             tgt_id = target_chars[0].id
             existing = [r for r in self._relationships.list()
-                        if r.source_id == src_id and r.target_id == tgt_id]
+                        if r.source == src_id and r.target == tgt_id]
             if existing:
                 self._relationships.upsert(existing[0].id,
                                            {"relationship_type": rel_type,
