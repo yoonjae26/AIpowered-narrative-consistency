@@ -1,4 +1,4 @@
-from backend.database.models import ArcProgress, CanonEntry, Character, LoreFact, MagicRule, Project, Relationship, Scene, TimelineEvent, User
+from backend.database.models import ArcProgress, CanonEntry, Character, LoreFact, MagicRule, PipelineAuditTrail, Project, Relationship, Scene, TimelineEvent, User
 from backend.database.session import Base, SessionLocal, engine, get_db_session
 
 __all__ = [
@@ -16,4 +16,5 @@ __all__ = [
 	"CanonEntry",
 	"MagicRule",
 	"ArcProgress",
+	"PipelineAuditTrail",
 ]

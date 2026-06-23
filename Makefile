@@ -1,46 +1,39 @@
-.PHONY: help install dev test lint format clean docker-build docker-up docker-down
+.RECIPEPREFIX := >
+
+.PHONY: help install dev dev-api test lint format clean
 
 help:
-@echo "NarrativeOS - Makefile Commands"
-@echo "================================"
-@echo "install       - Install dependencies"
-@echo "dev           - Run development server"
-@echo "test          - Run tests"
-@echo "lint          - Run linters"
-@echo "format        - Format code"
-@echo "clean         - Clean cache and build files"
-@echo "docker-build  - Build Docker containers"
-@echo "docker-up     - Start Docker services"
-@echo "docker-down   - Stop Docker services"
+>echo "NarrativeOS - Makefile Commands"
+>echo "================================"
+>echo "install       - Install dependencies"
+>echo "dev           - Run backend API locally on server"
+>echo "dev-api       - Alias for dev"
+>echo "test          - Run tests"
+>echo "lint          - Run linters"
+>echo "format        - Format code"
+>echo "clean         - Clean cache and build files"
 
 install:
-poetry install
+>poetry install
 
-dev:
-docker-compose -f infrastructure/docker/docker-compose.dev.yml up
+dev: dev-api
+
+dev-api:
+>poetry run uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
 
 test:
-poetry run pytest -v --cov=backend --cov-report=html
+>poetry run pytest -v --cov=backend --cov-report=html
 
 lint:
-poetry run ruff check backend/
-poetry run mypy backend/
+>poetry run ruff check backend/
+>poetry run mypy backend/
 
 format:
-poetry run black backend/
-poetry run ruff check --fix backend/
+>poetry run black backend/
+>poetry run ruff check --fix backend/
 
 clean:
-find . -type d -name "__pycache__" -exec rm -rf {} +
-find . -type f -name "*.pyc" -delete
-find . -type d -name "*.egg-info" -exec rm -rf {} +
-rm -rf .pytest_cache .coverage htmlcov/
-
-docker-build:
-docker-compose -f infrastructure/docker/docker-compose.dev.yml build
-
-docker-up:
-docker-compose -f infrastructure/docker/docker-compose.dev.yml up -d
-
-docker-down:
-docker-compose -f infrastructure/docker/docker-compose.dev.yml down
+>find . -type d -name "__pycache__" -exec rm -rf {} +
+>find . -type f -name "*.pyc" -delete
+>find . -type d -name "*.egg-info" -exec rm -rf {} +
+>rm -rf .pytest_cache .coverage htmlcov/

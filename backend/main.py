@@ -15,6 +15,7 @@ from backend.api.routes.projects import router as projects_router
 from backend.api.routes.ws import router as ws_router
 from backend.core.config import get_settings
 from backend.core.exceptions import NarrativeError
+from backend.llm.healthcheck import run_startup_llm_healthcheck
 
 
 settings = get_settings()
@@ -31,6 +32,11 @@ app.add_middleware(
 app.add_middleware(RateLimiterMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(LoggingMiddleware)
+
+
+@app.on_event("startup")
+async def startup_health_checks() -> None:
+    app.state.llm_health = run_startup_llm_healthcheck()
 
 
 @app.exception_handler(NarrativeError)
@@ -52,8 +58,9 @@ async def root() -> dict[str, object]:
 
 
 @app.get("/health")
-async def health_check() -> dict[str, str]:
-    return {"status": "healthy"}
+async def health_check() -> dict[str, object]:
+    llm_health = getattr(app.state, "llm_health", None)
+    return {"status": "healthy", "llm": llm_health}
 
 
 @app.get("/meta")

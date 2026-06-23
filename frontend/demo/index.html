@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NarrativeOS Author IDE Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="ide-shell">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <p class="brand-eyebrow">NarrativeOS Demo</p>
+          <h1>Author IDE Validation Console</h1>
+          <p class="brand-quote">
+            VSCode does not write software. It supports developers writing software.
+            NarrativeOS does not write stories. It supports authors writing stories.
+          </p>
+        </div>
+        <div class="topbar-actions">
+          <label class="field inline-field">
+            <span>API Base</span>
+            <input id="apiBase" value="http://localhost:8001" />
+          </label>
+          <button id="healthBtn" class="btn btn-secondary">Health</button>
+          <button id="kgBtn" class="btn btn-secondary">KG Summary</button>
+          <button id="graphBtn" class="btn btn-secondary">Trust Links</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="pane pane-left">
+          <section class="panel">
+            <div class="section-head">
+              <h2>PBKD Editor</h2>
+              <button id="loadCharactersBtn" class="btn btn-secondary">Refresh</button>
+            </div>
+
+            <label class="field">
+              <span>Character</span>
+              <select id="characterSelect"></select>
+            </label>
+
+            <div class="split-two">
+              <label class="field">
+                <span>P Personality</span>
+                <textarea id="pbkdPersonality" rows="4"></textarea>
+              </label>
+              <label class="field">
+                <span>B Beliefs</span>
+                <textarea id="pbkdBeliefs" rows="4"></textarea>
+              </label>
+              <label class="field">
+                <span>K Knowledge</span>
+                <textarea id="pbkdKnowledge" rows="4"></textarea>
+              </label>
+              <label class="field">
+                <span>D Desires</span>
+                <textarea id="pbkdDesires" rows="4"></textarea>
+              </label>
+            </div>
+
+            <div class="row-actions">
+              <button id="savePbkdBtn" class="btn btn-primary">Save PBKD</button>
+              <span id="pbkdStatus" class="status-line">Idle.</span>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h2>PBKD Search</h2>
+              <button id="pbkdSearchBtn" class="btn btn-secondary">Search</button>
+            </div>
+
+            <label class="field">
+              <span>Query</span>
+              <input id="pbkdSearchQuery" placeholder="pacifist, revenge, distrust..." />
+            </label>
+
+            <div class="scope-row">
+              <label><input id="scopeP" type="checkbox" checked /> P</label>
+              <label><input id="scopeB" type="checkbox" checked /> B</label>
+              <label><input id="scopeK" type="checkbox" checked /> K</label>
+              <label><input id="scopeD" type="checkbox" checked /> D</label>
+            </div>
+
+            <pre id="pbkdSearchOutput" class="output compact">No search yet.</pre>
+          </section>
+        </aside>
+
+        <section class="pane pane-center">
+          <section class="panel">
+            <div class="section-head">
+              <h2>Scene Workspace</h2>
+              <div class="row-actions">
+                <label class="toggle-inline">
+                  <input id="allowOverride" type="checkbox" /> allow canon override
+                </label>
+                <button id="mutationBtn" class="btn btn-primary">Run Scene</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <span>Scenario Presets</span>
+              <div id="scenarioList" class="scenario-list"></div>
+            </div>
+
+            <label class="field">
+              <span>Scene Title</span>
+              <input id="sceneTitle" value="Gate validation scene" />
+            </label>
+
+            <label class="field">
+              <span>Scene Text</span>
+              <textarea id="sceneText" rows="13"></textarea>
+            </label>
+          </section>
+
+          <section class="panel gate-panel">
+            <div class="section-head">
+              <h2>Pre-Persist Gate</h2>
+              <span id="gateDecisionBadge" class="decision decision-none">NO DECISION</span>
+            </div>
+            <p id="gateMessage" class="gate-message">Run scene to evaluate approve/reject/needs-override.</p>
+            <div id="gateReasons" class="gate-reasons"></div>
+            <pre id="mutationOutput" class="output">No mutation run yet.</pre>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h2>Structured Auto-Editor</h2>
+              <button id="rewriteBtn" class="btn btn-secondary">Verify + Patch</button>
+            </div>
+
+            <p class="status-line">
+              Scene -> Verifier -> Issue list -> LLM structured patch -> Targeted edit apply
+            </p>
+
+            <label class="field">
+              <span>Instructions</span>
+              <textarea id="rewriteInstructions" rows="4" placeholder="Tighten the pacing, keep canon stable, and make the dialogue more tense."></textarea>
+            </label>
+
+            <label class="field">
+              <span>Target Tone</span>
+              <input id="rewriteTone" value="clear, controlled, cinematic" />
+            </label>
+
+            <div class="row-actions">
+              <button id="applyRewriteBtn" class="btn btn-primary">Apply Patched Text</button>
+              <span id="rewriteStatus" class="status-line">Idle.</span>
+            </div>
+
+            <label class="field">
+              <span>Patch Decisions (JSON array)</span>
+              <textarea
+                id="patchDecisionEditor"
+                rows="7"
+                placeholder='[{"patch_id":"issue_1_cand_1","action":"accept"},{"patch_id":"issue_2_cand_1","action":"edit","edited_with":"..."}]'
+              ></textarea>
+            </label>
+
+            <pre id="rewriteOutput" class="output compact">No structured patch yet.</pre>
+          </section>
+        </section>
+
+        <aside class="pane pane-right">
+          <section class="panel">
+            <div class="section-head">
+              <h2>Consistency Check</h2>
+              <button id="consistencyBtn" class="btn btn-secondary">Check</button>
+            </div>
+            <label class="field">
+              <span>Narrative</span>
+              <textarea id="consistencyText" rows="7"></textarea>
+            </label>
+            <pre id="consistencyOutput" class="output compact">No consistency run yet.</pre>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h2>Query Story State</h2>
+              <button id="queryBtn" class="btn btn-secondary">Ask</button>
+            </div>
+            <label class="field">
+              <span>Question</span>
+              <input id="queryText" value="What happened to Anna?" />
+            </label>
+            <pre id="queryOutput" class="output compact">No query yet.</pre>
+          </section>
+
+          <section class="panel">
+            <h2>System Responses</h2>
+            <pre id="healthOutput" class="output compact">No health check yet.</pre>
+            <pre id="kgOutput" class="output compact">No KG summary yet.</pre>
+            <pre id="graphOutput" class="output compact">No relationship query yet.</pre>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

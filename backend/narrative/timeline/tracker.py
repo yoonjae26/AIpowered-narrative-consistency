@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 
 from backend.database.repositories.timeline_repository import TimelineRepository
 
@@ -9,7 +9,9 @@ class TimelineEvent:
 	id: str
 	title: str
 	description: str | None = None
-	happened_at: datetime = field(default_factory=datetime.utcnow)
+	happened_at: datetime = field(
+    default_factory=lambda: datetime.now(UTC)
+)
 	metadata: dict[str, object] = field(default_factory=dict)
 
 

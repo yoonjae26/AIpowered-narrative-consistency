@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from math import sqrt
+from typing import Any
 
 from backend.rag.embeddings.embedder import BaseEmbedder, HashEmbedder
 
@@ -30,6 +31,36 @@ class SemanticSearch:
 
 	def index(self, document_id: str, content: str, **metadata: object) -> None:
 		self._documents[document_id] = (content, self.embedder.embed(content), dict(metadata))
+
+	def index_vector(self, document_id: str, content: str, vector: list[float], **metadata: object) -> None:
+		self._documents[document_id] = (content, list(vector), dict(metadata))
+
+	def remove(self, document_id: str) -> None:
+		self._documents.pop(document_id, None)
+
+	def clear(self) -> None:
+		self._documents.clear()
+
+	def dump_documents(self) -> list[dict[str, Any]]:
+		return [
+			{
+				"id": document_id,
+				"content": content,
+				"vector": list(vector),
+				"metadata": dict(metadata),
+			}
+			for document_id, (content, vector, metadata) in self._documents.items()
+		]
+
+	def load_documents(self, documents: list[dict[str, Any]]) -> None:
+		self.clear()
+		for document in documents:
+			self.index_vector(
+				document_id=str(document["id"]),
+				content=str(document["content"]),
+				vector=[float(value) for value in document.get("vector", [])],
+				**dict(document.get("metadata", {})),
+			)
 
 	def search(self, query: str, limit: int = 5) -> list[SearchHit]:
 		query_vector = self.embedder.embed(query)

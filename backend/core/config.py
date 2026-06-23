@@ -23,6 +23,17 @@ class Settings(BaseSettings):
 	rate_limit_window_seconds: int = 60
 	redis_url: str = "redis://localhost:6379/0"
 	database_url: str = "sqlite:///./narrativeos.db"
+	analysis_cache_ttl_seconds: int = 3600
+	analysis_ruleset_version: str = "v1"
+	analysis_worker_poll_seconds: float = 1.0
+	semantic_memory_confidence_threshold: float = 0.72
+	semantic_memory_pending_threshold: float = 0.35
+	semantic_promotion_min_occurrences: int = 2
+	semantic_promotion_min_distinct_scenes: int = 2
+	semantic_promotion_min_average_confidence: float = 0.45
+	llm_provider: str = "qwen"
+	llm_model: str = "qwen2.5:7b-instruct"
+	llm_base_url: str | None = None
 	openai_api_key: str | None = None
 	anthropic_api_key: str | None = None
 	langfuse_public_key: str | None = None

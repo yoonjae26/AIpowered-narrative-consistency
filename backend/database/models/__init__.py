@@ -3,6 +3,7 @@ from backend.database.models.canon_entry import CanonEntry
 from backend.database.models.character import Character
 from backend.database.models.lore_fact import LoreFact
 from backend.database.models.magic_rule import MagicRule
+from backend.database.models.pipeline_audit import PipelineAuditTrail
 from backend.database.models.project import Project
 from backend.database.models.relationship import Relationship
 from backend.database.models.scene import Scene
@@ -20,4 +21,5 @@ __all__ = [
 	"CanonEntry",
 	"MagicRule",
 	"ArcProgress",
+	"PipelineAuditTrail",
 ]

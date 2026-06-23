@@ -7,7 +7,7 @@ A comprehensive narrative writing and consistency management system with AI-powe
 ```
 ├── backend/          # Python backend (FastAPI)
 ├── frontend/         # React/Next.js frontend
-├── infrastructure/   # Docker, K8s, CI/CD
+├── infrastructure/   # K8s, CI/CD, server deployment notes
 ├── docs/            # Documentation
 ├── datasets/        # Training and reference data
 ├── experiments/     # ML experiments
@@ -28,12 +28,31 @@ A comprehensive narrative writing and consistency management system with AI-powe
 # Run setup script
 ./scripts/setup.sh
 
-# Start development environment
+# Start backend API on server
 make dev
 
 # Run tests
 make test
 ```
+
+## Demo (One Command)
+
+Run the full demo stack (LLM + backend + frontend) with GPU 3:
+
+```bash
+./scripts/start_demo.sh
+```
+
+Stop the full demo stack:
+
+```bash
+./scripts/stop_demo.sh
+```
+
+Endpoints:
+- Demo UI: http://127.0.0.1:4173
+- Backend API: http://127.0.0.1:8001
+- LLM API: http://127.0.0.1:11434/v1
 
 ## Tech Stack
 
@@ -51,7 +70,7 @@ make test
 - D3.js (Relationship Graph)
 
 ### Infrastructure
-- Docker & Docker Compose
+- Server-based deployment (no Docker in this repo workflow)
 - Kubernetes (Production)
 - GitHub Actions (CI/CD)
 - Nginx (Reverse Proxy)

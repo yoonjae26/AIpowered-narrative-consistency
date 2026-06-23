@@ -10,6 +10,9 @@ class LLMMessage:
 	role: str
 	content: str
 
+	def as_payload(self) -> dict[str, str]:
+		return {"role": self.role, "content": self.content}
+
 
 @dataclass(slots=True)
 class LLMResponse:
