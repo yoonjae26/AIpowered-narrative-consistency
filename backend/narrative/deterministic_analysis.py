@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.consistency import MultiAgentNarrativeAnalyzer, SemanticValidator
 from backend.consistency.agents import CharacterAgent, CriticAgent, LoreAgent, TimelineAgent
+
+if TYPE_CHECKING:
+    from backend.narrative.reasoning.pbkd_reasoner import PBKDInference
 
 
 @dataclass(slots=True)
@@ -63,6 +66,7 @@ class DeterministicNarrativeAnalyzer:
         chronology_conflicts: list[str],
         flashback_count: int,
         flash_forward_count: int,
+        pbkd_inferences: list[PBKDInference] | None = None,
     ) -> DeterministicAnalysisBundle:
         normalized_references = self.normalize_references(references)
         semantic_result = self._semantic.validate(
@@ -70,6 +74,7 @@ class DeterministicNarrativeAnalyzer:
             references=normalized_references,
             events=events,
             character_memories=character_memories,
+            pbkd_inferences=pbkd_inferences,
         )
         multi_agent_report = self._agents.analyze(
             scene_text,

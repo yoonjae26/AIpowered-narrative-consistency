@@ -35,10 +35,30 @@ _PLACEHOLDER_NAMES = {"...", "…", "<name>", "<character_name>", "<location_nam
                       "character_name", "location_name", "object_name", "concept_name", ""}
 
 _STOPWORDS = {
+    # English
     "the", "a", "an", "he", "she", "they", "it", "his", "her", "their",
     "this", "that", "these", "those", "then", "there", "when", "where",
     "what", "who", "which", "said", "asked", "replied",
+    # Korean pronouns, particles, and non-name common words
+    "그", "그녀", "그는", "그가", "그의", "그녀는", "그녀가", "그녀의",
+    "그들", "그들은", "그들이", "그들의", "그것", "그것은", "그것이",
+    "나", "나는", "나의", "내가", "내", "저", "저는", "저의", "제가",
+    "너", "너는", "너의", "네가", "당신", "당신은", "당신의",
+    "우리", "우리는", "우리의", "이", "저것", "이것", "것", "수많",
+    "특히", "하지만", "그래서", "그리고", "또는", "또한", "그런데",
+    "그렇게", "하나", "이미", "오직", "모든", "각각", "서로",
+    # Korean common nouns that are not character names
+    "가족", "행동", "선택", "수호", "수호자", "상황", "이유", "목적",
+    "의지", "결정", "방법", "방향", "세계", "세상", "생각", "마음",
+    "시간", "공간", "현실", "진실", "비밀", "운명", "전쟁", "평화",
+    "자유", "정의", "희망", "죽음", "사람", "두", "세", "여러",
+    "신념", "바람", "꿈", "기억", "감정", "눈물", "빛", "어둠",
+    "랜턴", "선택의", "두사람", "두인물",
 }
+
+_KO_PARTICLE_SUFFIX = re.compile(
+    r"(을|를|은|는|이|가|의|와|과|에|로|으로|도|만|까지|부터|에서|이야|야|랑|이랑)$"
+)
 
 _TEMPORAL_PREFIXES = {
     "after", "before", "later", "then", "next", "meanwhile", "suddenly", "moments later",
@@ -47,10 +67,16 @@ _TEMPORAL_PREFIXES = {
 
 def _is_valid_name(name: str) -> bool:
     stripped = name.strip().strip(".")
-    return (bool(stripped)
-            and name not in _PLACEHOLDER_NAMES
-            and len(name) >= 2
-            and name.lower() not in _STOPWORDS)
+    if not stripped or stripped in _PLACEHOLDER_NAMES or len(stripped) < 2:
+        return False
+    lower = stripped.lower()
+    if lower in _STOPWORDS:
+        return False
+    # Strip Korean particles and validate the stem too
+    stem = _KO_PARTICLE_SUFFIX.sub("", lower)
+    if stem != lower and (stem in _STOPWORDS or len(stem) < 2):
+        return False
+    return True
 
 
 def _normalize_entity_name(name: str) -> str:
@@ -93,18 +119,28 @@ _PROPER_NOUN_RE = re.compile(
 )
 
 _LOCATION_KEYWORDS = {
+    # 한국어 장소 키워드
+    "성", "숲", "도시", "마을", "왕국", "동굴", "산", "강", "궁전", "탑",
+    "폐허", "신전", "사원", "여관", "방", "홀", "거리", "다리", "항구",
+    "계곡", "섬", "해안", "들판", "전장", "시장", "광장", "요새", "감옥",
+    "황야", "벌판", "숲속", "해변", "바다", "호수", "골목", "광야",
+    # 영어 병행 지원 (영어 소설 참고용)
     "castle", "forest", "city", "town", "village", "kingdom", "cave",
     "mountain", "river", "palace", "dungeon", "ruins", "temple", "inn",
-    "tavern", "tower", "room", "chamber", "hall", "street", "bridge",
-    "gate", "port", "harbour", "harbor", "valley", "island", "shore",
-    "field", "battlefield", "market", "square", "keep", "fortress",
+    "tower", "room", "hall", "bridge", "port", "valley", "island",
+    "field", "battlefield", "fortress",
 }
 
 _OBJECT_KEYWORDS = {
+    # 한국어 물건 키워드
+    "검", "방패", "반지", "두루마리", "지도", "열쇠", "책", "약", "지팡이",
+    "왕관", "보석", "부적", "단검", "망토", "랜턴", "편지", "상자",
+    "활", "화살", "도끼", "창", "구슬", "유물", "성물", "문서", "인장",
+    "갑옷", "투구", "장갑", "망원경", "나침반", "횃불", "수정",
+    # 영어 병행 지원
     "sword", "shield", "ring", "scroll", "map", "key", "book", "potion",
-    "staff", "crown", "gem", "stone", "amulet", "dagger", "cloak",
-    "lantern", "letter", "chest", "bow", "arrow", "axe", "spear",
-    "orb", "wand", "tome", "relic", "artifact",
+    "staff", "crown", "gem", "amulet", "dagger", "cloak", "lantern",
+    "letter", "chest", "bow", "arrow", "axe", "spear", "relic", "artifact",
 }
 
 # Compiled action patterns: (pattern, EventType, target_required)
@@ -114,24 +150,28 @@ _COMPILED_ACTIONS = [
 ]
 
 _ENTITY_EXTRACTION_PROMPT = """\
-You are a narrative entity extractor.
-Extract ALL entities that appear in the SCENE TEXT provided at the end.
-Return ONLY a valid JSON object -- no markdown, no extra text.
+당신은 서사 엔티티 추출기입니다. 한국어 소설을 처리합니다.
+아래 장면 텍스트에 등장하는 모든 엔티티를 추출하세요.
+마크다운 없이 유효한 JSON 객체만 반환하세요.
 
-JSON structure:
+JSON 구조:
 {{
-  "characters": [{{"name": "<exact name from text>", "attributes": {{"role": "<role>", "emotion": "<emotion>", "action": "<action>"}}}}],
-  "locations":  [{{"name": "<exact place name from text>", "attributes": {{"type": "<indoor|outdoor|other>"}}}}],
-  "objects":    [{{"name": "<exact object name from text>", "attributes": {{"significance": "<significance>"}}}}],
-  "concepts":   [{{"name": "<abstract concept from text>", "attributes": {{}}}}]
+  "characters": [{{"name": "<인물의 고유 이름>", "attributes": {{"role": "<역할>", "emotion": "<감정>", "action": "<행동>"}}}}],
+  "locations":  [{{"name": "<텍스트에 나온 정확한 장소 이름>", "attributes": {{"type": "<실내|실외|기타>"}}}}],
+  "objects":    [{{"name": "<텍스트에 나온 정확한 사물 이름>", "attributes": {{"significance": "<의미>"}}}}],
+  "concepts":   [{{"name": "<텍스트의 추상적 개념>", "attributes": {{}}}}]
 }}
 
-Rules:
-- Use ONLY names that appear literally in the scene text.
-- Do NOT copy names or attributes from this prompt's examples.
-- If a category has no entities, use an empty array [].
+규칙:
+- 장면 텍스트에 실제로 등장하는 이름만 사용하세요.
+- 이 프롬프트의 예시에서 이름이나 속성을 복사하지 마세요.
+- 해당 카테고리에 엔티티가 없으면 빈 배열 []을 사용하세요.
+- 인물(characters)은 반드시 고유명사 — 실제 이름이어야 합니다. 대명사는 안 됩니다.
+- 다음 한국어 대명사를 인물로 추출하지 마세요: 그, 그녀, 그는, 그가, 그의, 그들, 나, 저, 너, 당신, 우리.
+- 한국어 부사, 조사, 접속사, 일반 명사를 인물로 추출하지 마세요.
+- 대명사로만 언급되고 이름이 없는 인물은 생략하세요.
 
-SCENE TEXT:
+장면 텍스트:
 {scene_text}"""
 
 
@@ -300,7 +340,7 @@ class EntityExtractor:
         prompt = _ENTITY_EXTRACTION_PROMPT.format(scene_text=scene_text)
         response = self._llm.complete([
             LLMMessage(role="system",
-                       content="You are a precise narrative entity extractor. Return only valid JSON."),
+                       content="당신은 한국어 소설 전문 서사 엔티티 추출기입니다. 유효한 JSON만 반환하세요."),
             LLMMessage(role="user", content=prompt),
         ])
         return self._parse_llm_response(response.content)

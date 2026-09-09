@@ -159,21 +159,124 @@ class NarrativeKnowledgeGraph:
                 },
             )
 
-            location = str(event.get("location") or "").strip()
+            location = str(item.get("location") or "").strip()
             if location:
                 loc_id = f"location:{location.lower()}"
                 self.upsert_node(loc_id, "location", location)
                 self.upsert_edge(
-                    edge_id=self._stable_edge_id(subject_id, loc_id, "located_at"),
-                    source=subject_id,
+                    edge_id=self._stable_edge_id(char_id, loc_id, "located_at"),
+                    source=char_id,
                     target=loc_id,
                     edge_type="located_at",
-                    timestamp=str(event.get("happened_at") or ""),
+                    timestamp=str(item.get("happened_at") or ""),
                     attributes={
-                        "event_type": event.get("event_type"),
-                        "event_id": event.get("event_id"),
+                        "event_type": item.get("event_type"),
+                        "event_id": item.get("event_id"),
                     },
                 )
+
+    # ------------------------------------------------------------------
+    # Conflict detection — KG reasoning path
+    # ------------------------------------------------------------------
+
+    # Stored edge_type X + new event_type Y → contradiction
+    _CONFLICTING_PAIRS: dict[str, frozenset] = {
+        "alliance":           frozenset({"betrayal", "conflict", "murder"}),
+        "marriage":           frozenset({"betrayal", "murder"}),
+        "relationship_forms": frozenset({"betrayal", "conflict", "murder"}),
+    }
+
+    def get_character_relationships(
+        self,
+        character_names: list[str],
+    ) -> list[dict[str, Any]]:
+        """Return all character-to-character edges for the given names."""
+        name_ids = {f"character:{n.lower().strip()}" for n in character_names if n.strip()}
+        results: list[dict[str, Any]] = []
+        for edge in self._edges.values():
+            if edge.source not in name_ids and edge.target not in name_ids:
+                continue
+            if not (edge.source.startswith("character:") and edge.target.startswith("character:")):
+                continue
+            results.append({
+                "source": edge.source,
+                "target": edge.target,
+                "edge_type": edge.edge_type,
+                "weight": int(edge.attributes.get("weight") or 1),
+                "timestamp": edge.timestamp,
+            })
+        return results
+
+    def detect_scene_contradictions(
+        self,
+        scene_events: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """
+        Compare incoming scene events against established graph facts.
+        Returns a list of contradiction dicts for character-to-character relationship conflicts.
+        """
+        contradictions: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str, str]] = set()
+
+        for event in scene_events:
+            subject_type = str(event.get("subject_type") or "")
+            target_type = str(event.get("target_type") or "")
+            if subject_type != "character" or target_type != "character":
+                continue
+
+            subject = str(event.get("subject") or "").strip().lower()
+            target = str(event.get("target") or "").strip().lower()
+            new_edge_type = str(event.get("event_type") or "").lower()
+            if not subject or not target or not new_edge_type:
+                continue
+
+            subject_id = f"character:{subject}"
+            target_id = f"character:{target}"
+
+            for edge in self._edges.values():
+                if not (edge.source.startswith("character:") and edge.target.startswith("character:")):
+                    continue
+                same_pair = (
+                    (edge.source == subject_id and edge.target == target_id) or
+                    (edge.source == target_id and edge.target == subject_id)
+                )
+                if not same_pair:
+                    continue
+
+                conflicting = self._CONFLICTING_PAIRS.get(edge.edge_type, frozenset())
+                if new_edge_type not in conflicting:
+                    continue
+
+                key = (edge.source, edge.target, edge.edge_type, new_edge_type)
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                weight = int(edge.attributes.get("weight") or 1)
+                if weight >= 3:
+                    severity = "critical"
+                elif weight >= 2:
+                    severity = "major"
+                else:
+                    severity = "minor"
+
+                char_a = edge.source.split(":", 1)[1]
+                char_b = edge.target.split(":", 1)[1]
+                contradictions.append({
+                    "character_a": char_a,
+                    "character_b": char_b,
+                    "stored_relation": edge.edge_type,
+                    "new_event": new_edge_type,
+                    "weight": weight,
+                    "severity": severity,
+                    "chain": (
+                        f"{char_a}와 {char_b}는 이전 {weight}회 씬에서 "
+                        f"'{edge.edge_type}' 관계로 확립되었으나, "
+                        f"이 씬에서 '{new_edge_type}' 이벤트가 모순됩니다."
+                    ),
+                })
+
+        return contradictions
 
     def traverse(self, node_id: str, depth: int = 1) -> dict[str, Any]:
         seen_nodes = {node_id}

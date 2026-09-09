@@ -23,6 +23,10 @@ class CharacterRepository:
     def get(self, character_id: str) -> Character | None:
         return self.db.get(Character, character_id)
 
+    def get_by_name(self, name: str) -> Character | None:
+        stmt = select(Character).where(Character.name.ilike(name))
+        return self.db.scalars(stmt).first()
+
     def create(
         self,
         character_id: str,
@@ -54,7 +58,7 @@ class CharacterRepository:
     def upsert(self, character_id: str, fields: dict[str, object]) -> Character:
         character = self.get(character_id)
         if character is None:
-            character = Character(id=character_id, name=str(fields.get("name") or "Unnamed Character"))
+            character = Character(id=character_id, name=str(fields.get("name") or "이름 없는 인물"))
         if "metadata" in fields:
             fields["metadata_json"] = fields.pop("metadata")
         for key, value in fields.items():

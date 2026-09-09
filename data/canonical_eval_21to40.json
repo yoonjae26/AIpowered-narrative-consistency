@@ -1,0 +1,1155 @@
+[
+  {
+    "chapter": 21,
+    "title": "해인사 사전 답사 / 해인사 승려 유인",
+    "elapsed": 15.0,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "수인",
+          "제승"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "수인",
+          "제승"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 25,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "travel"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "alliance",
+          "char_trait",
+          "character_appears",
+          "dialogue",
+          "discovery",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 22,
+    "title": "해인사 재물 탈취",
+    "elapsed": 13.3,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "제승",
+          "하인"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "제승",
+          "하인"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 12,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "capture",
+          "char_trait",
+          "conflict",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 23,
+    "title": "관군 유인과 탈출",
+    "elapsed": 14.1,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "timeline_beat",
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 24,
+    "title": "활빈당 선언",
+    "elapsed": 12.2,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 14,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [
+          "dialogue"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.5,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "alliance",
+          "char_trait",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 25,
+    "title": "함경감영 습격 작전 / 함경감영 창고 탈취",
+    "elapsed": 19.7,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "함경감사"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "함경감사"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 28,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "char_trait",
+          "conflict",
+          "discovery",
+          "escape",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 26,
+    "title": "활빈당 공고",
+    "elapsed": 11.7,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 27,
+    "title": "분신술",
+    "elapsed": 13.4,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "홍길동"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "홍길동"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 19,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 28,
+    "title": "팔도 동시 작란",
+    "elapsed": 13.0,
+    "clean": {
+      "entity": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "detected": [
+          "전하",
+          "팔도 감사"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [
+          "전하",
+          "팔도 감사"
+        ],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 15,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "capture",
+          "char_emotion",
+          "char_trait",
+          "discovery",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 29,
+    "title": "임금의 진노 / 포도대장 이업",
+    "elapsed": 12.6,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 0.5,
+        "detected": [
+          "이업",
+          "전하",
+          "홍길동"
+        ],
+        "expected": [
+          "이업",
+          "홍 승상"
+        ],
+        "true_positives": [
+          "이업"
+        ],
+        "false_positives": [
+          "전하",
+          "홍길동"
+        ],
+        "false_negatives": [
+          "홍 승상"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 28,
+        "count_in_range": true,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "alliance",
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 30,
+    "title": "이업과의 조우",
+    "elapsed": 14.1,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "이업",
+          "홍길동"
+        ],
+        "expected": [
+          "이업",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "이업",
+          "홍길동"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 19,
+        "count_in_range": false,
+        "required_covered": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "alliance",
+          "char_trait",
+          "character_appears",
+          "character_exits",
+          "dialogue",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 31,
+    "title": "이업 가죽부대",
+    "elapsed": 15.3,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "이업",
+          "지부대왕",
+          "황건역사들"
+        ],
+        "expected": [
+          "이업",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "이업"
+        ],
+        "false_positives": [
+          "지부대왕",
+          "황건역사들"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 19,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "capture",
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "discovery",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 32,
+    "title": "홍가 투옥 / 길현의 방서",
+    "elapsed": 14.7,
+    "clean": {
+      "entity": {
+        "precision": 0.4,
+        "recall": 1.0,
+        "detected": [
+          "길현",
+          "우승상",
+          "전하",
+          "홍 승상",
+          "홍길동"
+        ],
+        "expected": [
+          "홍 승상",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길현",
+          "홍 승상"
+        ],
+        "false_positives": [
+          "우승상",
+          "전하",
+          "홍길동"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 25,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "capture",
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 33,
+    "title": "형과의 재회",
+    "elapsed": 11.7,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "길현"
+        ],
+        "expected": [
+          "홍길동",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길동",
+          "길현"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 18,
+        "count_in_range": false,
+        "required_covered": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "dialogue",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 34,
+    "title": "여덟 길동 입경",
+    "elapsed": 14.9,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 35,
+    "title": "승상 기절 / 길동의 자기변호",
+    "elapsed": 14.8,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "홍 승상",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "홍 승상",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          5,
+          40
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 36,
+    "title": "병조판서 요구",
+    "elapsed": 12.1,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 37,
+    "title": "동대문 밖 진세",
+    "elapsed": 13.5,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "신장"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "신장"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 19,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "capture",
+          "char_trait",
+          "character_appears",
+          "conflict",
+          "dialogue",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 38,
+    "title": "병조판서 제수",
+    "elapsed": 12.8,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "전하"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "전하"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 39,
+    "title": "임금께 하직",
+    "elapsed": 12.0,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "임금",
+          "전하"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "임금",
+          "전하"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "dialogue"
+        ],
+        "required_missing": [
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.5,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "dialogue",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 40,
+    "title": "정조 삼천석과 조선 출발",
+    "elapsed": 15.2,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "전하"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "전하"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 13,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "travel"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_exits",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  }
+]

@@ -21,49 +21,49 @@ from backend.narrative.semantic_relation_extractor import KoreanSemanticRelation
 
 logger = logging.getLogger(__name__)
 
-# Human-readable predicate templates per event type
+# Human-readable predicate templates per event type (Korean)
 _PREDICATES: dict[EventType, str] = {
-    EventType.MURDER:              "{subject} kills {target}",
-    EventType.DEATH:               "{subject} dies",
-    EventType.INJURY:              "{subject} injures {target}",
-    EventType.BIRTH:               "{subject} is born",
-    EventType.RESURRECTION:        "{subject} is resurrected",
-    EventType.MARRIAGE:            "{subject} marries {target}",
-    EventType.BETRAYAL:            "{subject} betrays {target}",
-    EventType.ALLIANCE:            "{subject} forms alliance with {target}",
-    EventType.CONFLICT:            "{subject} clashes with {target}",
-    EventType.DISCOVERY:           "{subject} discovers something",
-    EventType.TRAVEL:              "{subject} travels",
-    EventType.CAPTURE:             "{subject} captures {target}",
-    EventType.ESCAPE:              "{subject} escapes",
-    EventType.CHARACTER_APPEARS:   "{subject} appears in the scene",
-    EventType.CHARACTER_EXITS:     "{subject} exits the scene",
-    EventType.CHARACTER_CHANGES:   "{subject} undergoes a change",
-    EventType.RELATIONSHIP_FORMS:  "{subject} and {target} form a relationship",
-    EventType.RELATIONSHIP_CHANGES:"{subject} and {target} relationship changes",
-    EventType.SCENE_OPENS:         "Scene '{subject}' begins",
-    EventType.SCENE_CLOSES:        "Scene '{subject}' ends",
-    EventType.TIMELINE_BEAT:       "Scene events recorded on timeline",
-    EventType.WORLD_STATE_CHANGE:  "Location '{subject}' is established",
+    EventType.MURDER:              "{subject}이(가) {target}을(를) 살해함",
+    EventType.DEATH:               "{subject}이(가) 사망함",
+    EventType.INJURY:              "{subject}이(가) {target}에게 부상을 입힘",
+    EventType.BIRTH:               "{subject}이(가) 태어남",
+    EventType.RESURRECTION:        "{subject}이(가) 부활함",
+    EventType.MARRIAGE:            "{subject}이(가) {target}과(와) 혼인함",
+    EventType.BETRAYAL:            "{subject}이(가) {target}을(를) 배신함",
+    EventType.ALLIANCE:            "{subject}이(가) {target}과(와) 동맹을 맺음",
+    EventType.CONFLICT:            "{subject}이(가) {target}과(와) 충돌함",
+    EventType.DISCOVERY:           "{subject}이(가) 무언가를 발견함",
+    EventType.TRAVEL:              "{subject}이(가) 이동함",
+    EventType.CAPTURE:             "{subject}이(가) {target}을(를) 포획함",
+    EventType.ESCAPE:              "{subject}이(가) 탈출함",
+    EventType.CHARACTER_APPEARS:   "{subject}이(가) 장면에 등장함",
+    EventType.CHARACTER_EXITS:     "{subject}이(가) 장면에서 퇴장함",
+    EventType.CHARACTER_CHANGES:   "{subject}에게 변화가 일어남",
+    EventType.RELATIONSHIP_FORMS:  "{subject}과(와) {target} 사이에 관계가 형성됨",
+    EventType.RELATIONSHIP_CHANGES:"{subject}과(와) {target}의 관계가 변화함",
+    EventType.SCENE_OPENS:         "장면 '{subject}' 시작",
+    EventType.SCENE_CLOSES:        "장면 '{subject}' 종료",
+    EventType.TIMELINE_BEAT:       "장면 사건이 타임라인에 기록됨",
+    EventType.WORLD_STATE_CHANGE:  "'{subject}' 공간이 설정됨",
 }
 
-_EVENT_GENERATION_PROMPT = """You are a narrative event extractor for a story engine.
-Given the scene text and the entities already extracted, produce a JSON array of narrative events.
+_EVENT_GENERATION_PROMPT = """당신은 스토리 엔진을 위한 서사 사건 추출기입니다.
+장면 텍스트와 이미 추출된 등장인물 정보를 바탕으로 서사 사건의 JSON 배열을 생성하세요.
 
-Each event object must have:
-  "event_type": one of {event_types}
-  "subject":    primary entity name (string)
-  "predicate":  concise description of what happened (string, max 20 words)
-  "target":     secondary entity name or null
-  "action":     the raw verb (e.g. "killed", "married") or null
-  "location":   location name or null
-  "attributes": dict of extra facts
+각 사건 객체는 반드시 다음 필드를 포함해야 합니다:
+  "event_type": {event_types} 중 하나
+  "subject":    주체 인물 이름 (문자열)
+  "predicate":  발생한 사건에 대한 간결한 설명 (문자열, 최대 20어절)
+  "target":     대상 인물 이름 또는 null
+  "action":     원형 동사 (예: "살해", "혼인") 또는 null
+  "location":   장소 이름 또는 null
+  "attributes": 추가 사실 딕셔너리
 
-Return ONLY the JSON array, no markdown, no extra text.
+마크다운 없이 JSON 배열만 반환하세요.
 
-Entities: {entities_summary}
+등장인물: {entities_summary}
 
-Scene text:
+장면 텍스트:
 {scene_text}"""
 
 
@@ -86,7 +86,7 @@ class EventGenerator:
             events.append(NarrativeEvent(
                 event_type=EventType.SCENE_OPENS,
                 subject=scene_title,
-                predicate=f"Scene '{scene_title}' begins",
+                predicate=f"장면 '{scene_title}' 시작",
                 source_scene=scene_title,
                 timestamp=now,
             ))
@@ -115,7 +115,7 @@ class EventGenerator:
                 events.append(NarrativeEvent(
                     event_type=EventType.CHARACTER_APPEARS,
                     subject=char.name,
-                    predicate=f"{char.name} appears in the scene",
+                    predicate=f"{char.name}이(가) 장면에 등장함",
                     attributes=char.attributes,
                     source_scene=scene_title,
                     timestamp=now,
@@ -125,7 +125,7 @@ class EventGenerator:
             events.append(NarrativeEvent(
                 event_type=EventType.WORLD_STATE_CHANGE,
                 subject=loc.name,
-                predicate=f"Location '{loc.name}' is established",
+                predicate=f"'{loc.name}' 공간이 설정됨",
                 attributes=loc.attributes,
                 source_scene=scene_title,
                 timestamp=now,
@@ -135,7 +135,7 @@ class EventGenerator:
         events.append(NarrativeEvent(
             event_type=EventType.TIMELINE_BEAT,
             subject=scene_title or "Scene",
-            predicate="Scene events recorded on timeline",
+            predicate="장면 사건이 타임라인에 기록됨",
             source_scene=scene_title,
             timestamp=now,
         ))
@@ -154,8 +154,10 @@ class EventGenerator:
 
         events: list[NarrativeEvent] = []
         for relation in relations:
-            if relation.relation == "has_emotion":
-                predicate = f"{relation.subject} feels {relation.value}"
+            is_emotion = relation.relation == "has_emotion"
+            etype = EventType.CHAR_EMOTION if is_emotion else EventType.CHAR_TRAIT
+            if is_emotion:
+                predicate = f"{relation.subject}이(가) {relation.value}을(를) 느낌"
                 attributes = {
                     "relation_type": relation.relation,
                     "emotion": relation.value,
@@ -165,7 +167,7 @@ class EventGenerator:
                     "provisional": relation.provisional,
                 }
             else:
-                predicate = f"{relation.subject} has trait {relation.value}"
+                predicate = f"{relation.subject}의 특성: {relation.value}"
                 attributes = {
                     "relation_type": relation.relation,
                     "trait": relation.value,
@@ -177,7 +179,7 @@ class EventGenerator:
 
             events.append(
                 NarrativeEvent(
-                    event_type=EventType.CHARACTER_CHANGES,
+                    event_type=etype,
                     subject=relation.subject,
                     predicate=predicate,
                     target=relation.value,
@@ -237,7 +239,7 @@ class EventGenerator:
         )
         response = self._llm.complete([
             LLMMessage(role="system",
-                       content="You are a precise narrative event extractor. Return only valid JSON arrays."),
+                       content="당신은 정밀한 서사 사건 추출기입니다. 유효한 JSON 배열만 반환하세요."),
             LLMMessage(role="user", content=prompt),
         ])
         return self._parse_llm_response(response.content, scene_title)

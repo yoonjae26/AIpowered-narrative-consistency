@@ -23,6 +23,8 @@ def format_mutation_api_response(runtime_result: RuntimeMutationResult) -> dict[
     decision = str(runtime_result.get("decision") or gate.get("decision") or ("approve" if success else "reject"))
 
     if not success:
+        raw_pbkd = runtime_result.get("pbkd_reasoning") or {}
+        raw_kg_conflicts = runtime_result.get("kg_conflicts") or []
         return MutationAPIResponse(
             payload={
                 "success": False,
@@ -31,7 +33,35 @@ def format_mutation_api_response(runtime_result: RuntimeMutationResult) -> dict[
                 "decision": decision,
                 "gate": _compact_gate(gate, fallback_decision=decision),
                 "preflight": _compact_preflight(runtime_result.get("preflight") or {}),
-                "audit": _compact_audit(audit_trail),
+                "audit": _compact_audit(runtime_result.get("audit_trail") or {}),
+                "pbkd_reasoning": {
+                    "inferences": [
+                        {
+                            "character": str(inf.get("character") or ""),
+                            "action": str(inf.get("action") or ""),
+                            "verdict": str(inf.get("verdict") or "ambiguous"),
+                            "dimension": str(inf.get("dimension") or "B"),
+                            "chain": str(inf.get("chain") or ""),
+                            "severity": str(inf.get("severity") or "minor"),
+                        }
+                        for inf in (raw_pbkd.get("inferences") or [])
+                        if isinstance(inf, Mapping)
+                    ],
+                    "contradiction_count": int(raw_pbkd.get("contradiction_count") or 0),
+                },
+                "kg_conflicts": [
+                    {
+                        "character_a": str(c.get("character_a") or ""),
+                        "character_b": str(c.get("character_b") or ""),
+                        "stored_relation": str(c.get("stored_relation") or ""),
+                        "new_event": str(c.get("new_event") or ""),
+                        "weight": int(c.get("weight") or 1),
+                        "severity": str(c.get("severity") or "minor"),
+                        "chain": str(c.get("chain") or ""),
+                    }
+                    for c in raw_kg_conflicts
+                    if isinstance(c, Mapping)
+                ],
                 "meta": {"response_version": "v2_compact"},
             }
         ).as_dict()
@@ -44,10 +74,12 @@ def format_mutation_api_response(runtime_result: RuntimeMutationResult) -> dict[
     semantic_validation = runtime_result.get("semantic_validation") or {}
     drift = runtime_result.get("drift") or {}
     multi_agent = runtime_result.get("multi_agent_analysis") or {}
+    raw_kg_conflicts_success = runtime_result.get("kg_conflicts") or []
     analysis_enrichment = runtime_result.get("analysis_enrichment") or {}
     audit_trail = runtime_result.get("audit_trail") or {}
     writer_warnings = runtime_result.get("writer_warnings") or []
     knowledge_graph = runtime_result.get("knowledge_graph") or {}
+    pbkd_reasoning = runtime_result.get("pbkd_reasoning") or {}
     graph_summary = (knowledge_graph.get("summary")) or {}
     scene_graph = (knowledge_graph.get("scene_projection")) or graph_summary
     quality_breakdown = _quality_breakdown(writer_warnings, consistency, multi_agent)
@@ -113,6 +145,34 @@ def format_mutation_api_response(runtime_result: RuntimeMutationResult) -> dict[
             },
             "audit": _compact_audit(audit_trail),
             "gate": _compact_gate(gate, fallback_decision=decision),
+            "pbkd_reasoning": {
+                "inferences": [
+                    {
+                        "character": str(inf.get("character") or ""),
+                        "action": str(inf.get("action") or ""),
+                        "verdict": str(inf.get("verdict") or "ambiguous"),
+                        "dimension": str(inf.get("dimension") or "B"),
+                        "chain": str(inf.get("chain") or ""),
+                        "severity": str(inf.get("severity") or "minor"),
+                    }
+                    for inf in (pbkd_reasoning.get("inferences") or [])
+                    if isinstance(inf, Mapping)
+                ],
+                "contradiction_count": int(pbkd_reasoning.get("contradiction_count") or 0),
+            },
+            "kg_conflicts": [
+                {
+                    "character_a": str(c.get("character_a") or ""),
+                    "character_b": str(c.get("character_b") or ""),
+                    "stored_relation": str(c.get("stored_relation") or ""),
+                    "new_event": str(c.get("new_event") or ""),
+                    "weight": int(c.get("weight") or 1),
+                    "severity": str(c.get("severity") or "minor"),
+                    "chain": str(c.get("chain") or ""),
+                }
+                for c in raw_kg_conflicts_success
+                if isinstance(c, Mapping)
+            ],
             "meta": {"response_version": "v2_compact"},
         }
     )

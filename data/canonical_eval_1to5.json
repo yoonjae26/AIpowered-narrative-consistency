@@ -1,0 +1,308 @@
+[
+  {
+    "chapter": 1,
+    "title": "홍승상의 가문 / 청룡몽",
+    "elapsed": 14.3,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "세종",
+          "홍 승상"
+        ],
+        "expected": [
+          "홍 승상"
+        ],
+        "true_positives": [
+          "홍 승상"
+        ],
+        "false_positives": [
+          "세종"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 25,
+        "count_in_range": true,
+        "required_covered": [
+          "char_trait",
+          "scene_opens",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          30
+        ],
+        "detected_types": [
+          "char_trait",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 2,
+    "title": "부인의 거절과 춘섬",
+    "elapsed": 14.4,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "유씨 부인",
+          "춘섬",
+          "홍 승상"
+        ],
+        "expected": [
+          "유씨 부인",
+          "춘섬",
+          "홍 승상"
+        ],
+        "true_positives": [
+          "유씨 부인",
+          "춘섬",
+          "홍 승상"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "char_trait",
+          "scene_opens"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_exits",
+          "conflict",
+          "relationship_forms",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 3,
+    "title": "길동의 탄생",
+    "elapsed": 15.4,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "춘섬",
+          "홍 승상"
+        ],
+        "expected": [
+          "춘섬",
+          "홍 승상",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "춘섬",
+          "홍 승상"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "birth",
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 4,
+    "title": "길동의 성장",
+    "elapsed": 13.7,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "부인",
+          "홍 승상"
+        ],
+        "expected": [
+          "유씨 부인",
+          "홍 승상",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "부인",
+          "홍 승상"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 14,
+        "count_in_range": true,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "dialogue",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 5,
+    "title": "천비의 아들",
+    "elapsed": 11.7,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "노복들",
+          "친척들"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "노복들",
+          "친척들"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 16,
+        "count_in_range": false,
+        "required_covered": [
+          "char_trait"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          2,
+          10
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "conflict",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  }
+]

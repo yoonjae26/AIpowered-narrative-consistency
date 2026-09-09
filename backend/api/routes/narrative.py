@@ -3,7 +3,7 @@ import re
 from datetime import datetime, UTC
 from typing import Literal
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from jose.jwt import UTC
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -142,6 +142,7 @@ class SnapshotRollbackRequest(BaseModel):
 
 class QueryRequest(BaseModel):
 	query: str
+	character_filter: str | None = None
 
 
 class RewriteRequest(BaseModel):
@@ -156,11 +157,13 @@ class RewriteRequest(BaseModel):
 
 
 class StructuredAutoEditRequest(RewriteRequest):
-	max_issues: int = Field(default=3, ge=1, le=12)
+	max_issues: int = Field(default=8, ge=1, le=16)
 	candidates_per_issue: int = Field(default=3, ge=1, le=6)
 	auto_apply: bool = False
 	use_knowledge_graph_evidence: bool = True
 	strict_reverification: bool = True
+	pbkd_inferences: list[dict[str, object]] = Field(default_factory=list)
+	kg_conflicts: list[dict[str, object]] = Field(default_factory=list)
 
 
 class StructuredPatch(BaseModel):
@@ -192,10 +195,10 @@ def _fallback_rewrite_response(request: RewriteRequest, reason: str) -> dict[str
 		"provider_used": None,
 		"reason": reason,
 		"rewritten_text": request.source_text,
-		"summary": "Fallback mode returned the original scene text unchanged.",
+		"summary": "대체 모드가 원본 장면 텍스트를 변경 없이 반환했습니다.",
 		"suggestions": [
-			"Connect a configured LLM provider to enable automatic rewriting.",
-			"Use the instructions field to steer style, tone, or structure.",
+			"자동 재작성을 활성화하려면 LLM 제공자를 설정하세요.",
+			"instructions 필드를 사용하여 문체, 어조, 구조를 조정하세요.",
 		],
 		"risk_notes": [],
 	}
@@ -223,9 +226,9 @@ def _parse_rewrite_payload(content: str) -> dict[str, object]:
 		pass
 	return {
 		"rewritten_text": content.strip(),
-		"summary": "Model returned non-JSON output.",
+		"summary": "모델이 JSON 형식이 아닌 응답을 반환했습니다.",
 		"suggestions": [],
-		"risk_notes": ["Non-JSON model output was returned as-is."],
+		"risk_notes": ["JSON 형식이 아닌 모델 출력이 원문 그대로 반환되었습니다."],
 	}
 
 
@@ -248,17 +251,16 @@ def _split_paragraphs(text: str) -> list[str]:
 def _extract_knowledge_graph_evidence(text: str) -> list[dict[str, str]]:
 	triples: list[dict[str, str]] = []
 	patterns = [
-		(r"\b([A-Z][a-z]+)\s+loves\s+([A-Z][a-z]+)\b", "loves"),
-		(r"\b([A-Z][a-z]+)\s+hates\s+([A-Z][a-z]+)\b", "hates"),
-		(r"\b([A-Z][a-z]+)\s+fears\s+([A-Z][a-z]+)\b", "fears"),
-		(r"\b([A-Z][a-z]+)\s+trusts\s+([A-Z][a-z]+)\b", "trusts"),
-		(r"\b([A-Z][a-z]+)\s+betrays\s+([A-Z][a-z]+)\b", "betrays"),
-		(r"\b([A-Z][a-z]+)\s+protects\s+([A-Z][a-z]+)\b", "protects"),
-		(r"\b([A-Z][a-z]+)\s+lives in\s+([A-Z][a-z]+)\b", "lives_in"),
-		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*사랑", "loves"),
-		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*두려워", "fears"),
-		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*신뢰", "trusts"),
-		(r"\b([가-힣]{2,6})는\s*([가-힣]{2,6})를\s*배신", "betrays"),
+		# 한국어 관계 패턴 (주요)
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*사랑", "loves"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*증오", "hates"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*두려워", "fears"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*신뢰", "trusts"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*배신", "betrays"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*보호", "protects"),
+		(r"([가-힣]{2,6})(?:이|가)?\s*([가-힣]{2,6})에\s*(?:살고|거주)", "lives_in"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})(?:을|를)\s*미워", "hates"),
+		(r"([가-힣]{2,6})(?:은|는|이|가)?[^.\n]{0,20}([가-힣]{2,6})와?\s*(?:동맹|연합)", "allies"),
 	]
 	for pattern, relation in patterns:
 		for match in re.finditer(pattern, text):
@@ -317,54 +319,200 @@ def _build_kg_reasoning_issues(paragraphs: list[str], triples: list[dict[str, st
 	return issues
 
 
-def _build_pbkd_recall_issues(paragraphs: list[str]) -> list[dict[str, object]]:
+def _pbkd_inferences_to_issues(inferences: list[dict[str, object]]) -> list[dict[str, object]]:
+	"""Convert PBKDInference dicts (from PBKDReasoner) into structured auto-edit issues.
+
+	Only contradictions are converted — consistent/ambiguous inferences are skipped.
+	"""
+	_DIM_LABELS = {"P": "Personality", "B": "Belief", "K": "Knowledge", "D": "Desire"}
 	issues: list[dict[str, object]] = []
-	fear_patterns = [
-		r"([A-Z][a-z]+|[가-힣]{2,6})(?:는|은|이|가)?[^.\n]{0,30}(무서워|두려워|fears|afraid)",
-	]
-	action_markers = r"(아무런\s*망설임\s*없이|망설임\s*없이|without hesitation|immediately|곧바로|아무 생각 없이|뛰어들|돌진)"
-	water_markers = r"(바다|물|강|sea|water|river)"
-	fear_subjects: dict[str, int] = {}
+	for idx, inf in enumerate(inferences, start=1):
+		if str(inf.get("verdict") or "") != "contradicts":
+			continue
+		character = str(inf.get("character") or "").strip()
+		action = str(inf.get("action") or "").strip()
+		chain = str(inf.get("chain") or "").strip()
+		dimension = str(inf.get("dimension") or "B").upper()
+		severity = str(inf.get("severity") or "minor")
+		dim_label = _DIM_LABELS.get(dimension, dimension)
+		issue_severity = "error" if severity == "critical" else "warning"
+		issues.append({
+			"issue_id": f"pbkd_{idx}_{character}",
+			"issue": f"PBKD/{dim_label} contradiction",
+			"type": "pbkd_conflict",
+			"location": "paragraph_1",
+			"severity": issue_severity,
+			"message": chain,
+			"evidence": [
+				{"type": "pbkd_inference", "value": f"{character}: {action}"},
+				{"type": "pbkd_chain", "value": chain},
+			],
+			"reasoning": [
+				chain,
+				f"{character}의 {dim_label}이/가 '{action}' 행동과 직접 모순됩니다.",
+				f"씬을 수정하여 {character}의 {dim_label} 프로파일과 일치하도록 만드세요.",
+			],
+			"replace_hint": action,
+			"with_hint": f"{character}의 {dim_label.lower()}과 일치하는 행동",
+			"pbkd_character": character,
+			"pbkd_dimension": dimension,
+			"pbkd_chain": chain,
+		})
+	return issues
 
-	for idx, paragraph in enumerate(paragraphs, start=1):
-		for pattern in fear_patterns:
-			for match in re.finditer(pattern, paragraph, flags=re.IGNORECASE):
-				subject = match.group(1)
-				fear_subjects[subject] = idx
 
+def _kg_conflicts_to_issues(conflicts: list[dict[str, object]]) -> list[dict[str, object]]:
+	"""Convert KG conflict dicts (from NarrativeKnowledgeGraph.detect_scene_contradictions) to auto-edit issues."""
+	issues: list[dict[str, object]] = []
+	for idx, conflict in enumerate(conflicts, start=1):
+		char_a = str(conflict.get("character_a") or "").strip()
+		char_b = str(conflict.get("character_b") or "").strip()
+		stored_rel = str(conflict.get("stored_relation") or "").strip()
+		new_event = str(conflict.get("new_event") or "").strip()
+		chain = str(conflict.get("chain") or "").strip()
+		severity = str(conflict.get("severity") or "minor")
+		weight = int(conflict.get("weight") or 1)
+
+		issue_severity = "error" if severity == "critical" else "warning"
+		issues.append({
+			"issue_id": f"kg_{idx}_{char_a}_{char_b}",
+			"issue": f"KG relationship conflict ({stored_rel}→{new_event})",
+			"type": "kg_conflict",
+			"location": "paragraph_1",
+			"severity": issue_severity,
+			"message": chain,
+			"evidence": [
+				{"type": "kg_edge", "value": f"{char_a} {stored_rel} {char_b} (confirmed {weight}x)"},
+				{"type": "kg_new_event", "value": f"{char_a} {new_event} {char_b}"},
+			],
+			"reasoning": [
+				chain,
+				f"{char_a}와 {char_b}의 기존 '{stored_rel}' 관계({weight}회 확립)가 '{new_event}' 이벤트와 모순됩니다.",
+				f"씬을 수정하여 기존 관계 '{stored_rel}'과 일치하도록 만드세요.",
+			],
+			"replace_hint": new_event,
+			"with_hint": f"{char_a}와 {char_b}의 '{stored_rel}' 관계와 일치하는 행동",
+			"kg_character_a": char_a,
+			"kg_character_b": char_b,
+			"kg_stored_relation": stored_rel,
+			"kg_new_event": new_event,
+			"kg_chain": chain,
+		})
+	return issues
+
+
+def _build_pbkd_recall_issues(paragraphs: list[str]) -> list[dict[str, object]]:
+	"""
+	역할 기반 PBKD/관계 일관성 검사.
+
+	이전 버그: 조사를 optional로 처리 → 목적어(Target)를 주어(Actor)로 오탐
+	개선: SentenceRoleParser로 Actor(이/가/은/는 필수) / Target(을/를 필수) 분리
+	  - Actor → PBKD 검사 (행동이 성격·신념과 일치하는가)
+	  - Actor↔Target → 관계 검사 (기존 관계와 일치하는가)
+	"""
+	from backend.narrative.reasoning.sentence_role_parser import (
+		CharacterRelationMemory,
+		ESTABLISHES_RELATIONSHIP,
+		parse_all_roles,
+	)
+
+	issues: list[dict[str, object]] = []
+
+	# 모든 단락의 문장 분리 후 역할 파싱
+	all_sentences: list[tuple[int, str]] = []  # (paragraph_idx, sentence)
 	for idx, paragraph in enumerate(paragraphs, start=1):
-		lowered = paragraph.lower()
-		for subject, first_idx in fear_subjects.items():
-			if idx <= first_idx:
-				continue
-			if subject not in paragraph:
-				continue
-			if re.search(action_markers, paragraph, re.IGNORECASE) and re.search(water_markers, lowered, re.IGNORECASE):
-				issues.append({
-					"issue_id": f"issue_{idx}_pbkd_{subject}",
-					"issue": "PBKD conflict",
-					"type": "pbkd_conflict",
-					"location": f"paragraph_{idx}",
-					"severity": "warning",
-					"message": f"{subject} shows abrupt behavior against established fear-related belief/state.",
-					"evidence": [
-						{"type": "pbkd_memory", "value": f"{subject} fear context established earlier."},
-						{"type": "paragraph_excerpt", "value": paragraph[:220]},
-					],
-					"reasoning": [
-						"Previous paragraph implies persistent fear/avoidance state.",
-						"Current paragraph action lacks transition phrase and creates PBKD drift.",
-					],
-					"replace_hint": "아무런 망설임 없이",
-					"with_hint": "두려움을 억누르며",
-				})
+		for sent in re.split(r"(?<=[.!?])\s*", paragraph.strip()):
+			if sent.strip():
+				all_sentences.append((idx, sent.strip()))
+
+	if not all_sentences:
+		return []
+
+	sentences_only = [s for _, s in all_sentences]
+	roles = parse_all_roles(sentences_only)
+
+	# 문장 순서대로 메모리를 누적 구축하며 모순 검사
+	# (선행 문장만 메모리에 포함 — 미래 문장의 관계가 과거 검사에 영향을 주지 않음)
+	incremental_memory = CharacterRelationMemory()
+
+	_EVENT_LABELS = {
+		"FEAR": "공포", "LOVE": "사랑", "TRUST": "신뢰",
+		"LOYAL": "충성", "PROTECT": "보호", "RESCUE": "구조",
+		"BETRAYAL": "배신", "MURDER": "살해", "ATTACK": "공격",
+		"HARM": "상해", "DECEIVE": "기만", "HATE": "증오",
+		"HELP": "도움", "FORGIVE": "용서", "SACRIFICE": "희생",
+		"REVENGE": "복수", "GIVE_UP": "포기", "RECONCILE": "화해",
+	}
+
+	for i, role in enumerate(roles):
+		# 관계 확립 문장: 모순 검사 없이 메모리에 기록하고 다음으로
+		if role.event_type in ESTABLISHES_RELATIONSHIP and role.actor:
+			incremental_memory.record(role)
+			continue
+		if not role.actor or not role.event_type:
+			continue
+
+		result = incremental_memory.find_contradiction(role)
+		if result is None:
+			continue
+
+		est_type, actor, targets = result
+		para_idx = all_sentences[i][0]
+		sentence = all_sentences[i][1]
+
+		est_label = _EVENT_LABELS.get(est_type, est_type)
+		act_label = _EVENT_LABELS.get(role.event_type, role.event_type)
+		target_str = f" '{role.target}'" if role.target else ""
+
+		# 이전에 관계를 확립한 문장 찾기 (증거로 사용)
+		est_evidence: list[str] = []
+		for j, prev_role in enumerate(roles[:i]):
+			if prev_role.actor == actor and prev_role.event_type == est_type:
+				est_evidence.append(all_sentences[j][1])
+				break
+
+		issues.append({
+			"issue_id": f"issue_{para_idx}_pbkd_{actor}_{role.event_type.lower()}",
+			"issue": "PBKD 충돌",
+			"type": "pbkd_conflict",
+			"location": f"paragraph_{para_idx}",
+			"severity": "warning",
+			"message": (
+				f"'{actor}'이(가){target_str} '{act_label}' 행동을 보이는데, "
+				f"이전에 확립된 '{est_label}' 관계/상태와 모순됩니다."
+			),
+			"description": (
+				f"Actor: {actor} / Action: {act_label} / Target: {role.target or '(불명)'}\n"
+				f"이전 확립: {actor} → {est_label} → {', '.join(targets)}"
+			),
+			"confidence": 0.78,
+			"severity_level": "major",
+			"reason": (
+				f"'{actor}'은(는) 이전에 '{', '.join(targets)}'에 대해 '{est_label}' 관계를 확립했습니다. "
+				f"이어지는 '{act_label}' 행동은 복선 없이 이 상태와 직접 모순됩니다."
+			),
+			"evidence": est_evidence + [sentence],
+			"suggestion": (
+				f"'{actor}'의 '{act_label}' 행동 이전에 내면 갈등·동기·전환점을 묘사하거나, "
+				f"기존 '{est_label}' 상태를 점진적으로 변화시키는 문장을 삽입하세요."
+			),
+			"replace_hint": role.action if role.action else "",
+			"with_hint": "",
+			"reasoning": [
+				f"행위 주체(Actor): {actor} — 이/가/은/는 조사로 식별",
+				f"행위 대상(Target): {role.target or '불명'} — 을/를 조사로 식별",
+				f"이전 확립 관계: {actor} → {est_label} → {', '.join(targets)}",
+				f"현재 행동 '{act_label}'이 '{est_label}'과 모순됨.",
+			],
+		})
+
 	return issues
 
 
 def _build_timeline_recall_issues(paragraphs: list[str]) -> list[dict[str, object]]:
 	issues: list[dict[str, object]] = []
-	dead_markers = r"(dead|died|killed|죽었다|사망했다|이미 죽은)"
-	alive_markers = r"(alive|returned|walked in|speaks|살아있|멀쩡히|돌아왔다)"
+	dead_markers = r"(죽었다|사망했다|이미 죽은|전사했다|숨졌다|목숨을 잃|죽음을 맞|dead|died|killed)"
+	alive_markers = r"(살아있|멀쩡히|돌아왔다|나타났다|걸어왔다|말했다|등장했다|alive|returned|walked in|speaks)"
 	names: set[str] = set()
 	for paragraph in paragraphs:
 		names.update(_extract_character_names(paragraph))
@@ -383,21 +531,21 @@ def _build_timeline_recall_issues(paragraphs: list[str]) -> list[dict[str, objec
 			if name in paragraph and re.search(alive_markers, paragraph, flags=re.IGNORECASE):
 				issues.append({
 					"issue_id": f"issue_{idx}_timeline_{name}",
-					"issue": "Timeline contradiction",
+					"issue": "타임라인 모순",
 					"type": "timeline_conflict",
 					"location": f"paragraph_{idx}",
 					"severity": "warning",
-					"message": f"{name} appears alive after being established as dead without timeline bridge.",
+					"message": f"{name}이(가) 사망 확정 이후 타임라인 연결 없이 생존 상태로 등장함.",
 					"evidence": [
-						{"type": "timeline_state", "value": f"{name} marked dead in paragraph_{dead_idx}"},
+						{"type": "timeline_state", "value": f"{name}은(는) {dead_idx}번째 단락에서 사망으로 기록됨"},
 						{"type": "paragraph_excerpt", "value": paragraph[:220]},
 					],
 					"reasoning": [
-						"Character life-state changed across timeline without explicit resurrection/flashback framing.",
-						"Needs disambiguation patch for chronology or scene framing.",
+						"명시적인 부활/플래시백 프레이밍 없이 인물의 생사 상태가 변경됨.",
+						"연대기 또는 장면 프레이밍에 대한 명확화 패치가 필요함.",
 					],
-					"replace_hint": "alive",
-					"with_hint": "as a memory or flashback",
+					"replace_hint": "살아서 나타났다",
+					"with_hint": "기억 속에서, 혹은 회상으로",
 				})
 	return issues
 
@@ -420,21 +568,21 @@ def _build_canon_recall_issues(paragraphs: list[str], preserve_canon: bool) -> l
 			if re.search(violation_markers, paragraph, flags=re.IGNORECASE):
 				issues.append({
 					"issue_id": f"issue_{idx}_canon_rule_{rule_idx}",
-					"issue": "Canon rule violation",
+					"issue": "정전 규칙 위반",
 					"type": "canon_conflict",
 					"location": f"paragraph_{idx}",
 					"severity": "warning",
-					"message": "Scene violates an earlier explicit canon prohibition.",
+					"message": "장면이 이전에 명시된 정전 금지 사항을 위반함.",
 					"evidence": [
 						{"type": "canon_rule", "value": rule_text[:220]},
 						{"type": "paragraph_excerpt", "value": paragraph[:220]},
 					],
 					"reasoning": [
-						"Earlier paragraph established explicit prohibition.",
-						"Later paragraph indicates direct violation without bridge/override context.",
+						"이전 단락에서 명시적 금지 사항이 확립됨.",
+						"이후 단락에서 연결/재정의 맥락 없이 직접적인 위반이 발생함.",
 					],
-					"replace_hint": "without consequence",
-					"with_hint": "with severe consequences",
+					"replace_hint": "아무런 대가 없이",
+					"with_hint": "심각한 결과를 감수하며",
 				})
 	return issues
 
@@ -454,40 +602,49 @@ def _verifier_issues(request: StructuredAutoEditRequest) -> list[dict[str, objec
 		for triple in kg_triples:
 			if triple["subject"].lower() in lowered or triple["object"].lower() in lowered:
 				local_evidence.append({"type": "kg_triple", "value": triple})
-		if "always" in lowered and "never" in lowered:
+		# 한국어 절대 모순: 항상/절대/결코 동시 사용
+		if re.search(r"항상|언제나|늘|반드시", paragraph) and re.search(r"절대|결코|한 번도|전혀", paragraph):
 			issues.append({
 				"issue_id": f"issue_{idx}_logic",
-				"issue": "Absolute contradiction",
+				"issue": "절대적 모순",
 				"type": "logic_conflict",
 				"location": f"paragraph_{idx}",
 				"severity": "warning",
-				"message": "Paragraph contains both 'always' and 'never'.",
+				"message": "같은 단락에 절대 긍정('항상/언제나')과 절대 부정('절대/결코')이 동시에 사용됨.",
 				"evidence": local_evidence,
 				"reasoning": [
-					"Detected contradictory absolutes in a single local context.",
-					"Targeted lexical replacement can preserve voice while removing contradiction.",
+					"단일 맥락 내에서 서로 모순되는 절대 표현이 감지됨.",
+					"어휘 교체를 통해 문체를 유지하면서 모순을 해소할 수 있음.",
 				],
-				"replace_hint": "always",
-				"with_hint": "often",
+				"replace_hint": "항상",
+				"with_hint": "종종",
 			})
-		if request.preserve_canon and re.search(r"\b(resurrect|resurrection|back to life|bring[s]? .* back)\b", lowered):
+		# 한국어 부활 패턴
+		if request.preserve_canon and re.search(r"부활|되살아|살아돌아|다시 살아|죽었다가\s*살|back to life|resurrect", paragraph):
 			issues.append({
 				"issue_id": f"issue_{idx}_canon",
-				"issue": "Canon conflict",
+				"issue": "정전 충돌",
 				"type": "canon_conflict",
 				"location": f"paragraph_{idx}",
 				"severity": "warning",
-				"message": "Potential resurrection event while canon preservation is enabled.",
+				"message": "정전 보존이 활성화된 상태에서 부활 관련 표현이 감지됨.",
 				"evidence": local_evidence,
 				"reasoning": [
-					"Resurrection-like phrase detected while preserve_canon is enabled.",
-					"Prefer reinterpretation patch over global rewrite.",
+					"정전 보존이 활성화된 상태에서 부활 유사 표현이 감지됨.",
+					"전체 재작성보다 재해석 패치를 선호하세요.",
 				],
-				"replace_hint": "back to life",
-				"with_hint": "through memory, not literal resurrection",
+				"replace_hint": "되살아났다",
+				"with_hint": "기억 속에 살아있었다",
 			})
 
-	issues.extend(_build_pbkd_recall_issues(paragraphs))
+	if request.pbkd_inferences:
+		issues.extend(_pbkd_inferences_to_issues(request.pbkd_inferences))
+	else:
+		issues.extend(_build_pbkd_recall_issues(paragraphs))
+
+	if request.kg_conflicts:
+		issues.extend(_kg_conflicts_to_issues(request.kg_conflicts))
+
 	issues.extend(_build_canon_recall_issues(paragraphs, preserve_canon=request.preserve_canon))
 	issues.extend(_build_timeline_recall_issues(paragraphs))
 	if request.use_knowledge_graph_evidence:
@@ -503,10 +660,15 @@ def _verifier_issues(request: StructuredAutoEditRequest) -> list[dict[str, objec
 			"severity": str(conflict.severity.value),
 			"message": conflict.message,
 			"evidence": [{"type": "baseline_rule", "value": conflict.message}],
-			"reasoning": ["Baseline consistency route flagged a warning."],
+			"reasoning": ["기본 일관성 검사에서 경고가 발생했습니다."],
 			"replace_hint": "",
 			"with_hint": "",
 		})
+
+	# Layer 2: 문체 분석 (결정론적 — LLM 없이)
+	from backend.narrative.style_analyzer import StyleAnalyzer  # noqa: PLC0415
+	style_issues = StyleAnalyzer().analyze(request.source_text, provider=None, use_llm=False)
+	issues.extend(style_issues)
 
 	seen: set[tuple[str, str]] = set()
 	deduped: list[dict[str, object]] = []
@@ -516,7 +678,10 @@ def _verifier_issues(request: StructuredAutoEditRequest) -> list[dict[str, objec
 			continue
 		seen.add(key)
 		deduped.append(item)
-	return deduped[:request.max_issues]
+	# consistency 이슈 우선, style 이슈 후순위 (consistency가 있으면 먼저 패치)
+	consistency_first = [i for i in deduped if not str(i.get("issue_id", "")).startswith("style_")]
+	style_only = [i for i in deduped if str(i.get("issue_id", "")).startswith("style_")]
+	return (consistency_first + style_only)[:request.max_issues]
 
 
 def _extract_character_names(text: str) -> set[str]:
@@ -554,7 +719,14 @@ def _score_patch_candidate(
 			},
 		}
 
-	verify_request = request.model_copy(update={"source_text": patched_text, "max_issues": max(12, request.max_issues)})
+	# For re-verification, clear pbkd_inferences: PBKD is scored independently below,
+	# and re-running the same inferences/conflicts on the patched text creates phantom issues.
+	verify_request = request.model_copy(update={
+		"source_text": patched_text,
+		"max_issues": max(12, request.max_issues),
+		"pbkd_inferences": [],
+		"kg_conflicts": [],
+	})
 	issues_after = _verifier_issues(verify_request)
 	issue_type = str(issue.get("type") or "")
 	issue_location = str(issue.get("location") or "")
@@ -571,23 +743,61 @@ def _score_patch_candidate(
 	else:
 		canon_score = 1.0
 
-	original_names = _extract_character_names(request.source_text)
-	patched_names = _extract_character_names(patched_text)
-	if request.preserve_characters and original_names:
-		retained = len(original_names.intersection(patched_names)) / max(1, len(original_names))
-		pbkd_score = round(retained, 3)
+	issue_type = str(issue.get("type") or "")
+	if issue_type == "pbkd_conflict" and issue.get("pbkd_chain"):
+		# PBKD-grounded score: check if the contradiction was resolved.
+		replace_hint = str(issue.get("replace_hint") or "").strip().lower()
+		contradiction_remains = replace_hint and replace_hint in patched_text.lower()
+		new_pbkd_issues = sum(1 for item in issues_after if str(item.get("type")) == "pbkd_conflict")
+		if contradiction_remains:
+			pbkd_score = 0.0
+		elif new_pbkd_issues == 0:
+			pbkd_score = 1.0
+		else:
+			pbkd_score = round(max(0.0, 1.0 - (0.3 * new_pbkd_issues)), 3)
+	elif issue_type == "kg_conflict" and issue.get("kg_chain"):
+		# KG-grounded score: check if the conflicting event phrase was removed.
+		replace_hint = str(issue.get("replace_hint") or "").strip().lower()
+		kg_conflict_remains = replace_hint and replace_hint in patched_text.lower()
+		new_kg_issues = sum(1 for item in issues_after if str(item.get("type")) == "kg_conflict")
+		if kg_conflict_remains:
+			pbkd_score = 0.0
+		elif new_kg_issues == 0:
+			pbkd_score = 1.0
+		else:
+			pbkd_score = round(max(0.0, 1.0 - (0.3 * new_kg_issues)), 3)
 	else:
-		pbkd_score = 1.0
+		original_names = _extract_character_names(request.source_text)
+		patched_names = _extract_character_names(patched_text)
+		if request.preserve_characters and original_names:
+			retained = len(original_names.intersection(patched_names)) / max(1, len(original_names))
+			pbkd_score = round(retained, 3)
+		else:
+			pbkd_score = 1.0
 
 	style_delta = abs(len(patched_text) - len(request.source_text)) / max(1, len(request.source_text))
 	style_score = max(0.0, 1.0 - min(1.0, style_delta * 4.0))
 
 	total = round((0.35 * consistency_score) + (0.25 * canon_score) + (0.2 * pbkd_score) + (0.2 * style_score), 4)
 	accepted = resolved_target and (new_issue_delta == 0 or not request.strict_reverification)
+	if issue_type == "pbkd_conflict":
+		pbkd_score_reason = (
+			"PBKD contradiction resolved" if pbkd_score >= 1.0 else
+			"PBKD contradiction still present" if pbkd_score == 0.0 else
+			f"PBKD partial ({pbkd_score:.2f})"
+		)
+	elif issue_type == "kg_conflict":
+		pbkd_score_reason = (
+			"KG conflict resolved" if pbkd_score >= 1.0 else
+			"KG conflict still present" if pbkd_score == 0.0 else
+			f"KG partial ({pbkd_score:.2f})"
+		)
+	else:
+		pbkd_score_reason = f"retained named entities ({pbkd_score:.2f})"
 	why_lines = [
 		f"Consistency score={consistency_score:.2f} (resolved_target={resolved_target}).",
 		f"Canon score={canon_score:.2f}.",
-		f"PBKD score={pbkd_score:.2f} based on retained named entities.",
+		f"PBKD score={pbkd_score:.2f} — {pbkd_score_reason}.",
 		f"Style score={style_score:.2f} from minimal length drift.",
 	]
 	if not accepted:
@@ -630,13 +840,13 @@ def _fallback_patch_candidates(issue: dict[str, object], count: int) -> list[dic
 	with_hint = str(issue.get("with_hint") or "")
 	if not replace_hint:
 		return []
-	variants = [with_hint, f"carefully {with_hint}".strip(), f"implicitly {with_hint}".strip()]
+	variants = [with_hint, f"{with_hint} (점진적으로)", f"{with_hint} (암묵적으로)"]
 	results: list[dict[str, str]] = []
 	for idx, candidate in enumerate(variants[:max(1, count)], start=1):
 		results.append({
 			"replace": replace_hint,
 			"with": candidate,
-			"rationale": f"Fallback candidate {idx} for {issue.get('issue', 'issue')}",
+			"rationale": f"폴백 후보 {idx}: {issue.get('issue', '문제')}",
 		})
 	return results
 
@@ -876,6 +1086,11 @@ def query_story(
 	request: QueryRequest,
 	state_engine: NarrativeStateMutationEngine = Depends(get_state_engine),
 ) -> dict[str, object]:
+	if request.character_filter:
+		return state_engine.retrieve_character_memories(
+			query_text=request.query,
+			character_name=request.character_filter,
+		)
 	return state_engine.query(request.query)
 
 
@@ -888,25 +1103,25 @@ def rewrite_scene_text(request: RewriteRequest) -> dict[str, object]:
 		return _fallback_rewrite_response(request, reason=str(exc))
 
 	prompt = "\n".join([
-		"Rewrite the following narrative scene for clarity, rhythm, and authorial control.",
-		"Return ONLY valid JSON with keys: rewritten_text, summary, suggestions, risk_notes.",
-		"Keep canon, named characters, and factual events stable unless instructions explicitly request a change.",
-		f"Scene title: {request.scene_title or 'Untitled'}",
-		f"Target tone: {request.target_tone or 'balanced'}",
-		f"Max length: {request.max_length or 1200}",
-		f"Preserve characters: {request.preserve_characters}",
-		f"Preserve canon: {request.preserve_canon}",
-		f"Style notes: {', '.join(request.style_notes) if request.style_notes else 'none'}",
-		f"Instructions: {request.instructions or 'none'}",
+		"다음 한국어 서사 장면을 명확성, 리듬, 작가적 통제를 위해 재작성하세요.",
+		"rewritten_text, summary, suggestions, risk_notes 키를 가진 유효한 JSON만 반환하세요.",
+		"명시적 지시가 없는 한 정전, 명명된 인물, 사실적 사건을 안정적으로 유지하세요.",
+		f"장면 제목: {request.scene_title or '제목 없음'}",
+		f"목표 어조: {request.target_tone or '균형잡힌'}",
+		f"최대 길이: {request.max_length or 1200}",
+		f"인물 보존: {request.preserve_characters}",
+		f"정전 보존: {request.preserve_canon}",
+		f"문체 메모: {', '.join(request.style_notes) if request.style_notes else '없음'}",
+		f"지시사항: {request.instructions or '없음'}",
 		"",
-		"Source text:",
+		"원본 텍스트:",
 		request.source_text,
 	])
 
 	from backend.llm.providers.base import LLMMessage
 	try:
 		response = provider.complete([
-			LLMMessage(role="system", content="You are a precise narrative editor."),
+			LLMMessage(role="system", content="당신은 한국어 소설 전문 정밀 서사 편집자입니다."),
 			LLMMessage(role="user", content=prompt),
 		])
 		payload = _parse_rewrite_payload(response.content)
@@ -925,7 +1140,7 @@ def rewrite_scene_structured(request: StructuredAutoEditRequest) -> dict[str, ob
 	if not issues:
 		return {
 			"provider_used": None,
-			"summary": "Verifier found no patchable issues.",
+			"summary": "Layer 1 (일관성) 및 Layer 2 (문체) 검사에서 이슈가 발견되지 않았습니다.",
 			"knowledge_graph_evidence": _extract_knowledge_graph_evidence(request.source_text),
 			"issues": [],
 			"patches": [],
@@ -948,6 +1163,21 @@ def rewrite_scene_structured(request: StructuredAutoEditRequest) -> dict[str, ob
 	else:
 		provider_error = ""
 
+	# Layer 2 LLM 심층 문체 분석 (provider가 있을 때만, 결정론적 분석 후 누락된 유형 추가)
+	if provider is not None:
+		from backend.narrative.style_analyzer import StyleAnalyzer  # noqa: PLC0415
+		existing_types = {str(i.get("issue_type", i.get("type", ""))) for i in issues}
+		llm_style = StyleAnalyzer().analyze(
+			request.source_text, provider=provider, use_llm=True
+		)
+		for si in llm_style:
+			if si["issue_type"] not in existing_types:
+				issues.append(si)
+				existing_types.add(si["issue_type"])
+		# 이슈가 많으면 max_issues * 2까지 허용 (style 이슈는 경미하므로)
+		max_cap = min(request.max_issues * 2, 12)
+		issues = issues[:max_cap]
+
 	kg_evidence = _extract_knowledge_graph_evidence(request.source_text) if request.use_knowledge_graph_evidence else []
 	baseline_count = len(issues)
 	ranked_candidates: list[dict[str, object]] = []
@@ -961,20 +1191,48 @@ def rewrite_scene_structured(request: StructuredAutoEditRequest) -> dict[str, ob
 		issue_candidates: list[dict[str, str]] = []
 
 		if provider is not None:
+			extra_context_lines: list[str] = []
+			if issue.get("pbkd_chain"):
+				extra_context_lines = [
+					"",
+					"PBKD Reasoning Context (grounded from character profile):",
+					f"  Character: {issue.get('pbkd_character', '')}",
+					f"  Dimension: {issue.get('pbkd_dimension', 'B')} (Personality/Belief/Knowledge/Desire)",
+					f"  Contradiction chain: {issue['pbkd_chain']}",
+					f"  Problematic action: {issue.get('replace_hint', '')}",
+					"  Repair goal: rewrite so the character's action aligns with their PBKD profile.",
+					"  Do NOT change other characters or unrelated events.",
+					"",
+				]
+			elif issue.get("kg_chain"):
+				extra_context_lines = [
+					"",
+					"Knowledge Graph Context (grounded from established narrative facts):",
+					f"  Character A: {issue.get('kg_character_a', '')}",
+					f"  Character B: {issue.get('kg_character_b', '')}",
+					f"  Established relation: {issue.get('kg_stored_relation', '')}",
+					f"  Conflicting new event: {issue.get('kg_new_event', '')}",
+					f"  Contradiction: {issue['kg_chain']}",
+					f"  Problematic action: {issue.get('replace_hint', '')}",
+					"  Repair goal: rewrite so the event aligns with the established relationship.",
+					"  Do NOT change unrelated characters or events.",
+					"",
+				]
 			prompt = "\n".join([
-				"You are a narrative quick-fix engine.",
-				"Generate multiple candidate patches for ONE issue.",
-				"Return STRICT JSON with keys: summary, risk_notes, patches.",
-				"Each patch must include: issue, location, replace, with, rationale.",
-				f"Need exactly up to {request.candidates_per_issue} candidates.",
-				"Avoid broad rewrites; patch only local span.",
-				f"Issue: {json.dumps(issue, ensure_ascii=True)}",
-				"Source text:",
+				"당신은 한국어 소설을 위한 서사 즉각 수정 엔진입니다.",
+				"하나의 이슈에 대한 복수의 후보 패치를 생성하세요.",
+				"summary, risk_notes, patches 키를 가진 엄격한 JSON만 반환하세요.",
+				"각 패치에는 반드시 포함: issue, location, replace, with, rationale.",
+				f"정확히 최대 {request.candidates_per_issue}개의 후보가 필요합니다.",
+				"광범위한 재작성을 피하고 로컬 구간만 패치하세요.",
+				*extra_context_lines,
+				f"이슈: {json.dumps(issue, ensure_ascii=False)}",
+				"원본 텍스트:",
 				request.source_text,
 			])
 			try:
 				response = provider.complete([
-					LLMMessage(role="system", content="You generate 2-3 deterministic patch alternatives for one narrative issue."),
+					LLMMessage(role="system", content="당신은 한국어 소설의 서사 이슈에 대해 2-3개의 결정론적 패치 대안을 생성합니다."),
 					LLMMessage(role="user", content=prompt),
 				])
 				issue_candidates = _parse_patch_candidate_payload(response.content)
@@ -1059,7 +1317,11 @@ def rewrite_scene_structured(request: StructuredAutoEditRequest) -> dict[str, ob
 	accepted_count = sum(1 for item in selected_patches if isinstance(item.get("verification"), dict) and item["verification"].get("accepted"))
 	return {
 		"provider_used": getattr(provider, "name", None),
-		"summary": "Structured auto-edit produced ranked patch candidates with re-verification.",
+		"summary": (
+			f"Layer 1+2 분석 완료 — {len(issues)}개 이슈 감지, {len(selected_patches)}개 패치 생성. "
+			f"일관성: {sum(1 for i in issues if not str(i.get('issue_id','')).startswith('style_'))}개, "
+			f"문체: {sum(1 for i in issues if str(i.get('issue_id','')).startswith('style_'))}개."
+		),
 		"knowledge_graph_evidence": kg_evidence,
 		"issues": issues,
 		"patches": selected_patches,
@@ -1224,6 +1486,12 @@ def summary(db: Session = Depends(get_db)) -> dict[str, object]:
 @router.post("/characters", response_model=CharacterState, status_code=status.HTTP_201_CREATED)
 def create_character(request: CharacterState, db: Session = Depends(get_db)) -> CharacterState:
 	repo = CharacterRepository(db)
+	existing = repo.get_by_name(request.name)
+	if existing is not None:
+		raise HTTPException(
+			status_code=status.HTTP_409_CONFLICT,
+			detail=f"Character with name '{request.name}' already exists (id={existing.id}). Use PATCH /characters/{existing.id} to update.",
+		)
 	traits, goals, metadata = _merge_pbkd_to_fields(
 		traits=request.traits,
 		goals=request.goals,
@@ -1299,6 +1567,16 @@ def update_character(character_id: str, request: CharacterUpdate, db: Session = 
 	)
 
 
+@router.delete("/characters/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_character(character_id: str, db: Session = Depends(get_db)) -> None:
+	repo = CharacterRepository(db)
+	existing = repo.get(character_id)
+	if existing is None:
+		raise HTTPException(status_code=404, detail="Character not found")
+	db.delete(existing)
+	db.commit()
+
+
 @router.get("/characters", response_model=list[CharacterState])
 def list_characters(db: Session = Depends(get_db)) -> list[CharacterState]:
 	repo = CharacterRepository(db)
@@ -1327,6 +1605,23 @@ def get_character_pbkd(character_id: str, db: Session = Depends(get_db)) -> Char
 	if item is None:
 		return CharacterPBKD()
 	return _normalize_pbkd(item.traits, item.goals, item.metadata_json)
+
+
+@router.get("/characters/{character_id}/memory")
+def get_character_memory(character_id: str, db: Session = Depends(get_db)) -> dict[str, object]:
+	"""Return raw memory state — trait_events with confidence + source_scene for PBKD Explorer."""
+	repo = CharacterRepository(db)
+	char = repo.get(character_id)
+	if char is None:
+		return {"character_id": character_id, "name": "", "trait_events": [], "pending_trait_events": []}
+	metadata = char.metadata_json or {}
+	memory = metadata.get("memory", {}) if isinstance(metadata, dict) else {}
+	return {
+		"character_id": character_id,
+		"name": char.name,
+		"trait_events": memory.get("trait_events", [])[-80:],
+		"pending_trait_events": memory.get("pending_trait_events", [])[-80:],
+	}
 
 
 @router.get("/characters/pbkd/search")
@@ -1435,19 +1730,44 @@ def add_timeline_event(request: TimelineEventCreate, db: Session = Depends(get_d
 	}
 
 
+_SYSTEM_LOG_PATTERNS = [
+	re.compile(r"^장면 사건이 타임라인에 기록됨$"),
+	re.compile(r"^'.+' 공간이 설정됨$"),
+	re.compile(r"^장면 '.+' (시작|종료)$"),
+	re.compile(r"^장면이 (시작됩니다|끝난다|끝납니다|종료됨|막을 내림)$"),
+]
+
+
+def _classify_timeline_event(title: str | None) -> Literal["story", "system"]:
+	"""Distinguish pipeline bookkeeping entries (scene/location lifecycle logs)
+	from actual narrative events, so the two don't get mixed in the timeline UI."""
+	text = (title or "").strip()
+	for pattern in _SYSTEM_LOG_PATTERNS:
+		if pattern.match(text):
+			return "system"
+	return "story"
+
+
 @router.get("/timeline/events")
-def list_timeline_events(db: Session = Depends(get_db)) -> list[dict[str, object]]:
+def list_timeline_events(
+	kind: Literal["story", "system", "all"] = "all",
+	db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
 	repo = TimelineRepository(db)
-	return [
+	events = [
 		{
 			"id": event.id,
 			"title": event.title,
 			"description": event.description,
 			"happened_at": event.happened_at,
 			"metadata": event.metadata_json,
+			"kind": _classify_timeline_event(event.title),
 		}
 		for event in repo.list()
 	]
+	if kind == "all":
+		return events
+	return [e for e in events if e["kind"] == kind]
 
 
 @router.post("/relationships")

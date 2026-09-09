@@ -102,6 +102,9 @@ logs/
 *.db
 *.sqlite3
 
+# Ship the pre-seeded demo DB so the demo works right after clone
+!narrativeos.db
+
 # =========================
 
 # Cache
@@ -227,3 +230,30 @@ temp/
 *.tmp
 *.bak
 *.orig
+
+# =========================
+
+# Claude Code local state
+
+# =========================
+
+.claude/
+
+# =========================
+
+# Runtime logs (start_demo.sh)
+
+# =========================
+
+.runlogs/
+
+# =========================
+
+# Personal presentation materials (not for public repo)
+
+# =========================
+
+PRESENTATION_GUIDE.md
+PRESENTATION_SCRIPT_KO.md
+data/backups/
+data/documents/files/e666539c_서사과부하팀.pdf

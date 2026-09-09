@@ -10,8 +10,12 @@ from backend.database.repositories.lore_repository import LoreRepository
 from backend.database.repositories.scene_repository import SceneRepository
 from backend.database.repositories.timeline_repository import TimelineRepository
 from backend.narrative.korean_text import normalize_korean_text
+from backend.narrative.mutation.models import (
+    EVENT_CATEGORY, EventCategory, EventType, INDEXABLE_CATEGORIES,
+    RetrievalProfile, PROFILE_SPEC,
+)
 from backend.rag.embeddings.chunk_strategy import ChunkStrategy
-from backend.rag.embeddings.embedder import BaseEmbedder, HashEmbedder
+from backend.rag.embeddings.embedder import BaseEmbedder, SentenceTransformerEmbedder
 from backend.rag.retrieval.hybrid_search import HybridSearch
 from backend.rag.retrieval.semantic_search import SearchHit
 
@@ -43,7 +47,7 @@ class NarrativeMemoryService:
         self._characters = character_repo
         self._timeline = timeline_repo
         self._search = HybridSearch(chunk_strategy=chunk_strategy)
-        self._search.semantic_search.embedder = embedder or HashEmbedder()
+        self._search.semantic_search.embedder = embedder or SentenceTransformerEmbedder()
         self._index_ready = False
         self._cache_path = Path(cache_path or ".cache/narrative_memory_index.json")
 
@@ -86,12 +90,28 @@ class NarrativeMemoryService:
         query: str,
         limit: int = 5,
         source_types: set[str] | None = None,
+        profile: RetrievalProfile | None = None,
     ) -> list[NarrativeMemoryHit]:
         self.ensure_ready()
         hits = self._search.search(normalize_korean_text(query), limit=max(limit * 3, 10))
         ranked = [self._convert_hit(hit) for hit in hits]
-        if source_types:
+
+        # Profile overrides source_types when supplied
+        if profile is not None:
+            spec = PROFILE_SPEC[profile]
+            if spec.source_types is not None:
+                ranked = [h for h in ranked if h.source_type in spec.source_types]
+            if spec.event_categories is not None:
+                allowed = {c.value for c in spec.event_categories}
+                ranked = [
+                    h for h in ranked
+                    if h.source_type != "event"
+                    or h.metadata.get("event_category") is None  # legacy cache: no category → pass through
+                    or h.metadata.get("event_category") in allowed
+                ]
+        elif source_types:
             ranked = [hit for hit in ranked if hit.source_type in source_types]
+
         ranked.sort(key=self._rank_key, reverse=True)
         return ranked[:limit]
 
@@ -100,8 +120,15 @@ class NarrativeMemoryService:
         query: str,
         character_name: str | None = None,
         limit: int = 6,
+        profile: RetrievalProfile | None = None,
     ) -> list[NarrativeMemoryHit]:
+        self.ensure_ready()
         collected: list[NarrativeMemoryHit] = []
+
+        # When a profile restricts source_types, skip phases that fall outside it
+        spec = PROFILE_SPEC[profile] if profile is not None else None
+        allowed_types = spec.source_types if spec is not None else None
+
         phases = [
             {"scene"},
             {"character"},
@@ -110,7 +137,9 @@ class NarrativeMemoryService:
         ]
 
         for source_types in phases:
-            hits = self.search(query, limit=max(limit, 6), source_types=source_types)
+            if allowed_types is not None and not source_types.intersection(allowed_types):
+                continue
+            hits = self.search(query, limit=max(limit, 6), source_types=source_types, profile=profile)
             if character_name and "character" in source_types:
                 hits = [
                     hit
@@ -125,7 +154,7 @@ class NarrativeMemoryService:
                 if len(collected) >= limit:
                     return collected
 
-        fallback = self.search(query, limit=max(limit, 6))
+        fallback = self.search(query, limit=max(limit, 6), profile=profile)
         for hit in fallback:
             if any(existing.id == hit.id for existing in collected):
                 continue
@@ -209,6 +238,8 @@ class NarrativeMemoryService:
         content = " ".join(
             filter(None, [scene.title, scene.summary or "", " ".join(scene.beats), " ".join(scene.characters)])
         )
+        if self._is_minimal_content(content):
+            return
         self._search.index(
             f"scene:{scene.id}",
             normalize_korean_text(content),
@@ -239,6 +270,8 @@ class NarrativeMemoryService:
                 " ".join(memory.get("desires", [])),
             ])
         )
+        if self._is_minimal_content(content):
+            return
         self._search.index(
             f"character:{character.id}",
             normalize_korean_text(content),
@@ -248,13 +281,22 @@ class NarrativeMemoryService:
         )
 
     def _upsert_runtime_event(self, event: Any) -> None:
+        event_type_obj = getattr(event, "event_type", None)
+        if event_type_obj is None:
+            return
+        category = EVENT_CATEGORY.get(event_type_obj)
+        if category not in INDEXABLE_CATEGORIES:
+            return
+        event_type_val = getattr(event_type_obj, "value", "") or ""
+        predicate = getattr(event, "predicate", "") or ""
+        target_val = getattr(event, "target", "") or ""
         event_id = getattr(event, "timestamp", None)
-        stable_id = f"event:{getattr(event, 'event_type').value}:{getattr(event, 'subject', '')}:{getattr(event, 'target', '')}:{event_id.isoformat() if event_id else ''}"
+        stable_id = f"event:{event_type_val}:{getattr(event, 'subject', '')}:{target_val}:{event_id.isoformat() if event_id else ''}"
         content = " ".join(
             filter(None, [
-                getattr(event, "predicate", ""),
+                predicate,
                 getattr(event, "subject", ""),
-                getattr(event, "target", "") or "",
+                target_val,
                 getattr(event, "location", "") or "",
                 getattr(event, "action", "") or "",
             ])
@@ -266,8 +308,18 @@ class NarrativeMemoryService:
             subject=getattr(event, "subject", None),
             target=getattr(event, "target", None),
             location=getattr(event, "location", None),
-            event_type=getattr(event, "event_type").value,
+            event_type=event_type_val,
+            event_category=category.value if category else None,
         )
+
+    @staticmethod
+    def _is_minimal_content(content: str) -> bool:
+        """Return True when content is too thin to produce a useful embedding."""
+        stripped = content.strip()
+        if len(stripped) < 15:
+            return True
+        tokens = stripped.split()
+        return len(tokens) < 3
 
     def _index_scenes(self) -> None:
         if self._scenes is None:
@@ -276,6 +328,8 @@ class NarrativeMemoryService:
             content = " ".join(
                 filter(None, [scene.title, scene.summary or "", " ".join(scene.beats), " ".join(scene.characters)])
             )
+            if self._is_minimal_content(content):
+                continue
             self._search.index(
                 f"scene:{scene.id}",
                 normalize_korean_text(content),
@@ -289,6 +343,8 @@ class NarrativeMemoryService:
             return
         for fact in self._lore.list():
             content = " ".join(filter(None, [fact.key, fact.value, fact.source or "", " ".join(fact.tags or [])]))
+            if self._is_minimal_content(content):
+                continue
             self._search.index(
                 f"lore:{fact.key}",
                 normalize_korean_text(content),
@@ -317,6 +373,8 @@ class NarrativeMemoryService:
                     " ".join(memory.get("desires", [])),
                 ])
             )
+            if self._is_minimal_content(content):
+                continue
             self._search.index(
                 f"character:{character.id}",
                 normalize_korean_text(content),
@@ -329,12 +387,23 @@ class NarrativeMemoryService:
         if self._timeline is None:
             return
         for event in self._timeline.list():
+            event_type_str = str(getattr(event, "event_type", "") or "")
+            try:
+                event_type_enum = EventType(event_type_str)
+            except ValueError:
+                continue  # unknown type — skip
+            category = EVENT_CATEGORY.get(event_type_enum)
+            if category not in INDEXABLE_CATEGORIES:
+                continue
+            title = str(event.title or "")
             meta = event.metadata_json or {}
-            content = " ".join(filter(None, [event.title, event.description or "", str(meta.get("location") or ""), str(meta)]))
+            content = " ".join(filter(None, [title, event.description or "", str(meta.get("location") or "")]))
             self._search.index(
                 f"event:{event.id}",
                 normalize_korean_text(content),
                 source_type="event",
+                event_type=event_type_str,
+                event_category=category.value,
                 happened_at=event.happened_at.isoformat() if event.happened_at else None,
             )
 NarrativeMemory = NarrativeMemoryService

@@ -1,0 +1,243 @@
+[
+  {
+    "chapter": 35,
+    "title": "승상 기절 / 길동의 자기변호",
+    "elapsed": 23.7,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "여덟 길동",
+          "전하",
+          "홍 승상"
+        ],
+        "expected": [
+          "홍 승상",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "홍 승상"
+        ],
+        "false_positives": [
+          "여덟 길동",
+          "전하"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 22,
+        "count_in_range": true,
+        "required_covered": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          5,
+          40
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "dialogue",
+          "discovery",
+          "escape",
+          "injury",
+          "resurrection",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 42,
+    "title": "망당산 약초 여행",
+    "elapsed": 13.3,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "백용",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "백용",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "timeline_beat",
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 53,
+    "title": "율도국 정복 결의",
+    "elapsed": 11.0,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 11,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "alliance",
+          "char_trait",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 54,
+    "title": "율도국 출병 / 칠십여 성 함락과 격서",
+    "elapsed": 15.1,
+    "clean": {
+      "entity": {
+        "precision": 0.75,
+        "recall": 0.75,
+        "detected": [
+          "길동",
+          "김인수",
+          "삼호걸",
+          "율도왕"
+        ],
+        "expected": [
+          "김인수",
+          "맹춘",
+          "율도왕",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "김인수",
+          "율도왕"
+        ],
+        "false_positives": [
+          "삼호걸"
+        ],
+        "false_negatives": [
+          "맹춘"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 27,
+        "count_in_range": true,
+        "required_covered": [
+          "travel",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "alliance",
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "conflict",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  }
+]

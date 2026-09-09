@@ -1,0 +1,380 @@
+{
+  "version": "v1",
+  "timestamp": "2026-08-02T20:01:13.727735",
+  "description": "NarrativeOS v1 Official Benchmark — 홍길동전 60챕터 canonical evaluation",
+  "model": "gpt-4o",
+  "pipeline_fixes": [
+    "분신술 RESURRECTION → warnings (non-blocking)",
+    "Dead character R1 check: suffix-alias protection + dry_run skip",
+    "state_engine dry_run mode (no DB writes during evaluation)",
+    "Late-story aliases: 대왕/왕대비/모비 added for Ch 55-60",
+    "왕 alias for 홍길동 (Ch 55-59), 모비 alias for 백소저 (Ch 58-59)"
+  ],
+  "summary": {
+    "chapters_evaluated": 60,
+    "entity_precision": 0.796,
+    "entity_recall": 0.849,
+    "event_recall": 0.867,
+    "gate_approve_count": 57,
+    "gate_reject_count": 3,
+    "gate_approve_rate": 0.95,
+    "total_true_positives": 113,
+    "total_false_positives": 46,
+    "total_false_negatives": 22,
+    "perfect_chapters_count": 20
+  },
+  "gate_reject_chapters": [
+    18,
+    26,
+    60
+  ],
+  "perfect_chapters": [
+    2,
+    3,
+    4,
+    5,
+    7,
+    12,
+    16,
+    20,
+    21,
+    24,
+    27,
+    30,
+    38,
+    39,
+    40,
+    41,
+    46,
+    47,
+    50,
+    53
+  ],
+  "failure_cases": {
+    "false_positives_by_chapter": {
+      "1": [
+        "세종"
+      ],
+      "8": [
+        "길동",
+        "무녀"
+      ],
+      "11": [
+        "길동"
+      ],
+      "13": [
+        "청의동자"
+      ],
+      "14": [
+        "초낭"
+      ],
+      "17": [
+        "괴이한 표자"
+      ],
+      "19": [
+        "도적"
+      ],
+      "22": [
+        "제승",
+        "하인"
+      ],
+      "23": [
+        "목공",
+        "제적",
+        "합천 원"
+      ],
+      "25": [
+        "함경감사"
+      ],
+      "29": [
+        "홍길동"
+      ],
+      "31": [
+        "지부대왕"
+      ],
+      "32": [
+        "우승상",
+        "홍길동",
+        "홍모"
+      ],
+      "33": [
+        "어떤 소년"
+      ],
+      "35": [
+        "전하",
+        "홍모"
+      ],
+      "37": [
+        "신장"
+      ],
+      "42": [
+        "백소저",
+        "제군"
+      ],
+      "43": [
+        "백용의 딸",
+        "을동 우두머리",
+        "정통 두 양인 여자"
+      ],
+      "44": [
+        "정통 두 양인",
+        "홍생"
+      ],
+      "45": [
+        "삼 부인",
+        "제도 군사"
+      ],
+      "48": [
+        "백소저",
+        "상인"
+      ],
+      "49": [
+        "길동",
+        "승상 홍문"
+      ],
+      "51": [
+        "대감 영위",
+        "형 길현"
+      ],
+      "54": [
+        "삼호걸"
+      ],
+      "55": [
+        "율도왕의 장자",
+        "한석"
+      ],
+      "56": [
+        "삼호걸",
+        "정통 두 부인",
+        "홍문"
+      ],
+      "58": [
+        "태자"
+      ],
+      "59": [
+        "태자"
+      ]
+    },
+    "false_negatives_by_chapter": {
+      "9": [
+        "유씨 부인"
+      ],
+      "18": [
+        "홍길동"
+      ],
+      "26": [
+        "홍길동"
+      ],
+      "28": [
+        "홍길동"
+      ],
+      "29": [
+        "홍 승상"
+      ],
+      "34": [
+        "임금"
+      ],
+      "43": [
+        "을동"
+      ],
+      "44": [
+        "백소저",
+        "정씨 부인",
+        "통씨 부인"
+      ],
+      "45": [
+        "백소저",
+        "정씨 부인",
+        "통씨 부인"
+      ],
+      "48": [
+        "춘섬"
+      ],
+      "49": [
+        "홍 승상"
+      ],
+      "51": [
+        "홍길현"
+      ],
+      "54": [
+        "맹춘"
+      ],
+      "55": [
+        "김인수"
+      ],
+      "57": [
+        "홍길동"
+      ],
+      "58": [
+        "홍길동"
+      ],
+      "60": [
+        "유씨 부인",
+        "홍길현"
+      ]
+    }
+  },
+  "confusion_summary": {
+    "fp_top10": [
+      {
+        "name": "길동",
+        "count": 3,
+        "chapters": [
+          8,
+          11,
+          49
+        ]
+      },
+      {
+        "name": "홍길동",
+        "count": 2,
+        "chapters": [
+          29,
+          32
+        ]
+      },
+      {
+        "name": "홍모",
+        "count": 2,
+        "chapters": [
+          32,
+          35
+        ]
+      },
+      {
+        "name": "백소저",
+        "count": 2,
+        "chapters": [
+          42,
+          48
+        ]
+      },
+      {
+        "name": "삼호걸",
+        "count": 2,
+        "chapters": [
+          54,
+          56
+        ]
+      },
+      {
+        "name": "태자",
+        "count": 2,
+        "chapters": [
+          58,
+          59
+        ]
+      },
+      {
+        "name": "세종",
+        "count": 1,
+        "chapters": [
+          1
+        ]
+      },
+      {
+        "name": "무녀",
+        "count": 1,
+        "chapters": [
+          8
+        ]
+      },
+      {
+        "name": "청의동자",
+        "count": 1,
+        "chapters": [
+          13
+        ]
+      },
+      {
+        "name": "초낭",
+        "count": 1,
+        "chapters": [
+          14
+        ]
+      }
+    ],
+    "fn_top10": [
+      {
+        "name": "홍길동",
+        "count": 5,
+        "chapters": [
+          18,
+          26,
+          28,
+          57,
+          58
+        ]
+      },
+      {
+        "name": "유씨 부인",
+        "count": 2,
+        "chapters": [
+          9,
+          60
+        ]
+      },
+      {
+        "name": "홍 승상",
+        "count": 2,
+        "chapters": [
+          29,
+          49
+        ]
+      },
+      {
+        "name": "백소저",
+        "count": 2,
+        "chapters": [
+          44,
+          45
+        ]
+      },
+      {
+        "name": "정씨 부인",
+        "count": 2,
+        "chapters": [
+          44,
+          45
+        ]
+      },
+      {
+        "name": "통씨 부인",
+        "count": 2,
+        "chapters": [
+          44,
+          45
+        ]
+      },
+      {
+        "name": "홍길현",
+        "count": 2,
+        "chapters": [
+          51,
+          60
+        ]
+      },
+      {
+        "name": "임금",
+        "count": 1,
+        "chapters": [
+          34
+        ]
+      },
+      {
+        "name": "을동",
+        "count": 1,
+        "chapters": [
+          43
+        ]
+      },
+      {
+        "name": "춘섬",
+        "count": 1,
+        "chapters": [
+          48
+        ]
+      }
+    ]
+  }
+}

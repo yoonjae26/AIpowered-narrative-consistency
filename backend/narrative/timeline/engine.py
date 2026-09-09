@@ -41,6 +41,7 @@ class TimelineEntry:
 class ChronologyReport:
     valid: bool = True
     conflicts: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     flashbacks: list[TimelineEntry] = field(default_factory=list)
     flash_forwards: list[TimelineEntry] = field(default_factory=list)
 
@@ -137,10 +138,13 @@ class TimelineEngine:
             elif ev.event_type == EventType.RESURRECTION:
                 resurrection_seq[subj] = entry.sequence
 
-        # Resurrection without prior death is a warning (not always wrong -- e.g. prophecy)
+        # Resurrection without prior death is a non-blocking warning — magical/ritual
+        # constructs (e.g. 분신술 clones dissolving and re-forming) are valid narrative
+        # devices that should not block the gate. Only a resurrection that is ordered
+        # BEFORE the recorded death is a genuine timeline conflict.
         for name, res_seq in resurrection_seq.items():
             if name not in death_seq:
-                report.conflicts.append(
+                report.warnings.append(
                     f"RESURRECTION of '{name}' with no recorded prior DEATH (possible canon violation)."
                 )
             elif death_seq[name] > res_seq:

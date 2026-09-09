@@ -1,204 +1,504 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NarrativeOS Author IDE Demo</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main class="ide-shell">
-      <header class="topbar">
-        <div class="topbar-brand">
-          <p class="brand-eyebrow">NarrativeOS Demo</p>
-          <h1>Author IDE Validation Console</h1>
-          <p class="brand-quote">
-            VSCode does not write software. It supports developers writing software.
-            NarrativeOS does not write stories. It supports authors writing stories.
-          </p>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NarrativeOS</title>
+  <link rel="stylesheet" href="./styles.css?v=24" />
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ── Topbar ───────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand-logo"><img src="./logo.png" alt="NarrativeOS logo" /></div>
+      <div class="topbar-divider"></div>
+      <button class="project-name-btn" id="projectNameBtn">
+        <span id="projectTitle">홍길동전</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <span class="project-chip">소설 프로젝트</span>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="globalSearch" placeholder="인물, 문서, 사건 검색..." autocomplete="off" />
+        <span class="topbar-search-kbd">⌘K</span>
+      </div>
+      <div class="avatar">H</div>
+    </div>
+  </header>
+
+  <!-- ── Shell: Sidebar + Views ───────────────────────────── -->
+  <div class="shell" id="shell">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-group">
+        <button class="nav-item active" data-view="dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span>대시보드</span>
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">스토리 바이블</div>
+        <button class="nav-item" data-view="characters">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          <span>인물</span>
+        </button>
+        <button class="nav-item" data-view="world">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
+          <span>세계관</span>
+        </button>
+        <button class="nav-item" data-view="timeline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>연표</span>
+        </button>
+        <button class="nav-item" data-view="graph">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><line x1="8.6" y1="7.5" x2="10.5" y2="15.5"/><line x1="15.4" y1="7.5" x2="13.5" y2="15.5"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
+          <span>관계도</span>
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">집필</div>
+        <button class="nav-item" data-view="workspace">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span>워크스페이스</span>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-stat"><span id="sbCharCount">–</span> 인물 · <span id="sbSceneCount">–</span> 씬</div>
+        <div class="sidebar-author">by <strong>Hong YoonJae</strong></div>
+      </div>
+    </nav>
+
+    <!-- View container -->
+    <div class="view-container">
+
+      <!-- ═══════════ Dashboard View ═══════════ -->
+      <section class="view active" id="view-dashboard">
+        <div class="view-inner dash-inner">
+          <div class="dash-head">
+            <p class="dash-greeting">안녕하세요 👋</p>
+            <h1 class="dash-title">NarrativeOS 대시보드</h1>
+            <p class="dash-sub">현재 프로젝트의 서사 데이터 현황과 빠른 작업 진입점입니다.</p>
+          </div>
+
+          <div class="stat-grid" id="statGrid">
+            <div class="stat-card"><div class="stat-icon stat-icon-char">👤</div><div><div class="stat-num" id="statChars">–</div><div class="stat-label">인물</div></div></div>
+            <div class="stat-card"><div class="stat-icon stat-icon-scene">📄</div><div><div class="stat-num" id="statScenes">–</div><div class="stat-label">씬</div></div></div>
+            <div class="stat-card"><div class="stat-icon stat-icon-time">🕒</div><div><div class="stat-num" id="statTimeline">–</div><div class="stat-label">연표 이벤트</div></div></div>
+            <div class="stat-card"><div class="stat-icon stat-icon-lore">🌍</div><div><div class="stat-num" id="statLore">–</div><div class="stat-label">세계관 설정</div></div></div>
+            <div class="stat-card"><div class="stat-icon stat-icon-rel">🔗</div><div><div class="stat-num" id="statRel">–</div><div class="stat-label">관계</div></div></div>
+          </div>
+
+          <div class="dash-section-title">빠른 이동</div>
+          <div class="quick-grid">
+            <button class="quick-card" data-view="characters">
+              <div class="quick-icon qi-char">👤</div>
+              <div class="quick-card-title">인물</div>
+              <div class="quick-card-desc">등장인물과 PBKD 프로필을 관리합니다</div>
+            </button>
+            <button class="quick-card" data-view="world">
+              <div class="quick-icon qi-world">🌍</div>
+              <div class="quick-card-title">세계관</div>
+              <div class="quick-card-desc">설정과 세계관 사실을 정리합니다</div>
+            </button>
+            <button class="quick-card" data-view="timeline">
+              <div class="quick-icon qi-time">🕒</div>
+              <div class="quick-card-title">연표</div>
+              <div class="quick-card-desc">사건의 시간 순서를 추적합니다</div>
+            </button>
+            <button class="quick-card" data-view="graph">
+              <div class="quick-icon qi-graph">🔗</div>
+              <div class="quick-card-title">관계도</div>
+              <div class="quick-card-desc">인물·사건 지식 그래프를 탐색합니다</div>
+            </button>
+            <button class="quick-card" data-view="workspace">
+              <div class="quick-icon qi-work">✍️</div>
+              <div class="quick-card-title">워크스페이스</div>
+              <div class="quick-card-desc">문서를 검토하고 AI 질의·일관성 검수를 실행합니다</div>
+            </button>
+          </div>
+
+          <div class="dash-section-title">최근 문서</div>
+          <div class="recent-docs-grid" id="recentDocsGrid">
+            <div class="dash-empty">문서를 불러오는 중...</div>
+          </div>
         </div>
-        <div class="topbar-actions">
-          <label class="field inline-field">
-            <span>API Base</span>
-            <input id="apiBase" value="http://localhost:8001" />
-          </label>
-          <button id="healthBtn" class="btn btn-secondary">Health</button>
-          <button id="kgBtn" class="btn btn-secondary">KG Summary</button>
-          <button id="graphBtn" class="btn btn-secondary">Trust Links</button>
+      </section>
+
+      <!-- ═══════════ Characters View ═══════════ -->
+      <section class="view" id="view-characters">
+        <div class="split-shell">
+          <div class="split-list-panel">
+            <div class="split-list-header">
+              <span class="split-list-title">인물 (<span id="charListCount">0</span>)</span>
+            </div>
+            <div class="split-search-row">
+              <input type="text" id="charSearchInput" class="split-search-input" placeholder="인물 이름으로 검색..." autocomplete="off" />
+            </div>
+            <div class="split-list" id="charList">
+              <div class="doc-loading"><div class="spinner-sm"></div><span>불러오는 중...</span></div>
+            </div>
+          </div>
+          <div class="split-detail-panel" id="charDetailPanel">
+            <div class="split-detail-empty">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              <p>왼쪽에서 인물을 선택하면<br>상세 프로필이 표시됩니다.</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </section>
 
-      <section class="workspace">
-        <aside class="pane pane-left">
-          <section class="panel">
-            <div class="section-head">
-              <h2>PBKD Editor</h2>
-              <button id="loadCharactersBtn" class="btn btn-secondary">Refresh</button>
+      <!-- ═══════════ World & Lore View ═══════════ -->
+      <section class="view" id="view-world">
+        <div class="view-inner">
+          <div class="view-header">
+            <h1 class="view-header-title">세계관</h1>
+            <p class="view-header-sub">서사의 배경이 되는 세계관 설정과 사실들입니다.</p>
+          </div>
+          <div class="lore-grid" id="loreGrid">
+            <div class="doc-loading"><div class="spinner-sm"></div><span>불러오는 중...</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ Timeline View ═══════════ -->
+      <section class="view" id="view-timeline">
+        <div class="view-inner">
+          <div class="view-header">
+            <div>
+              <h1 class="view-header-title">연표</h1>
+              <p class="view-header-sub">서사 속 사건들을 시간 순서대로 정리합니다.</p>
             </div>
-
-            <label class="field">
-              <span>Character</span>
-              <select id="characterSelect"></select>
+            <label class="timeline-toggle">
+              <input type="checkbox" id="timelineShowSystem" />
+              <span>시스템 로그 이벤트도 표시 (<span id="timelineSystemCount">0</span>건)</span>
             </label>
+          </div>
+          <div class="timeline-rail" id="timelineRail">
+            <div class="doc-loading"><div class="spinner-sm"></div><span>불러오는 중...</span></div>
+          </div>
+        </div>
+      </section>
 
-            <div class="split-two">
-              <label class="field">
-                <span>P Personality</span>
-                <textarea id="pbkdPersonality" rows="4"></textarea>
-              </label>
-              <label class="field">
-                <span>B Beliefs</span>
-                <textarea id="pbkdBeliefs" rows="4"></textarea>
-              </label>
-              <label class="field">
-                <span>K Knowledge</span>
-                <textarea id="pbkdKnowledge" rows="4"></textarea>
-              </label>
-              <label class="field">
-                <span>D Desires</span>
-                <textarea id="pbkdDesires" rows="4"></textarea>
-              </label>
+      <!-- ═══════════ Knowledge Graph View ═══════════ -->
+      <section class="view" id="view-graph">
+        <div class="graph-shell">
+          <div class="split-list-panel">
+            <div class="split-list-header"><span class="split-list-title">인물 선택</span></div>
+            <div class="split-list" id="graphCharList">
+              <div class="doc-loading"><div class="spinner-sm"></div><span>불러오는 중...</span></div>
+            </div>
+          </div>
+          <div class="graph-canvas-wrap">
+            <div class="graph-toolbar">
+              <span class="graph-toolbar-label" id="graphToolbarLabel">인물을 선택하면 관계망이 표시됩니다</span>
+              <div class="graph-depth-control">
+                <label for="graphDepth">깊이</label>
+                <select id="graphDepth" class="graph-depth-select">
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                </select>
+              </div>
+            </div>
+            <canvas id="graphCanvas"></canvas>
+            <div class="graph-empty" id="graphEmpty">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><line x1="8.6" y1="7.5" x2="10.5" y2="15.5"/><line x1="15.4" y1="7.5" x2="13.5" y2="15.5"/><line x1="9" y1="6" x2="15" y2="6"/></svg>
+              <p>왼쪽에서 인물을 선택하세요.</p>
+            </div>
+            <div class="graph-legend" id="graphLegend"></div>
+          </div>
+          <div class="split-detail-panel" id="graphDetailPanel">
+            <div class="split-detail-empty">
+              <p>노드를 클릭하면<br>상세 정보가 표시됩니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ Workspace View (existing 3-column, unchanged) ═══════════ -->
+      <section class="view" id="view-workspace">
+        <div class="body" id="body">
+
+          <!-- Left Panel: Document List -->
+          <aside class="left-panel">
+            <div class="lp-header">
+              <span class="lp-title">프로젝트 문서</span>
+              <svg class="lp-title-info" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <button class="lp-export-btn" title="내보내기">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </button>
             </div>
 
-            <div class="row-actions">
-              <button id="savePbkdBtn" class="btn btn-primary">Save PBKD</button>
-              <span id="pbkdStatus" class="status-line">Idle.</span>
+            <!-- Upload Zone -->
+            <div class="upload-zone" id="uploadZone">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="upload-icon"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p class="upload-text">파일을 드래그하거나 클릭하여 업로드</p>
+              <p class="upload-formats">DOCX · PDF · TXT · Markdown</p>
             </div>
-          </section>
+            <input type="file" id="fileInput" multiple accept=".txt,.md,.docx,.pdf" style="display:none" />
 
-          <section class="panel">
-            <div class="section-head">
-              <h2>PBKD Search</h2>
-              <button id="pbkdSearchBtn" class="btn btn-secondary">Search</button>
-            </div>
-
-            <label class="field">
-              <span>Query</span>
-              <input id="pbkdSearchQuery" placeholder="pacifist, revenge, distrust..." />
-            </label>
-
-            <div class="scope-row">
-              <label><input id="scopeP" type="checkbox" checked /> P</label>
-              <label><input id="scopeB" type="checkbox" checked /> B</label>
-              <label><input id="scopeK" type="checkbox" checked /> K</label>
-              <label><input id="scopeD" type="checkbox" checked /> D</label>
+            <!-- Category filter + upload -->
+            <div class="category-filter-bar">
+              <button class="cat-filter-chip active" data-cat="">전체</button>
+              <button class="cat-filter-chip" data-cat="세계관">세계관</button>
+              <button class="cat-filter-chip" data-cat="캐릭터">캐릭터</button>
+              <button class="cat-filter-chip" data-cat="원고">원고</button>
+              <button class="cat-filter-chip" data-cat="연표">연표</button>
+              <button class="cat-filter-chip" data-cat="기준문서">기준문서</button>
+              <button class="cat-filter-chip" data-cat="메모">메모</button>
             </div>
 
-            <pre id="pbkdSearchOutput" class="output compact">No search yet.</pre>
-          </section>
-        </aside>
-
-        <section class="pane pane-center">
-          <section class="panel">
-            <div class="section-head">
-              <h2>Scene Workspace</h2>
-              <div class="row-actions">
-                <label class="toggle-inline">
-                  <input id="allowOverride" type="checkbox" /> allow canon override
-                </label>
-                <button id="mutationBtn" class="btn btn-primary">Run Scene</button>
+            <!-- Doc list header -->
+            <div class="doc-list-hd">
+              <span class="doc-list-count" id="docCount">문서 목록 (0)</span>
+              <div class="doc-list-actions">
+                <select class="sort-select" id="sortSelect">
+                  <option value="latest">최신순</option>
+                  <option value="name">이름순</option>
+                  <option value="size">크기순</option>
+                </select>
               </div>
             </div>
 
-            <div class="field">
-              <span>Scenario Presets</span>
-              <div id="scenarioList" class="scenario-list"></div>
+            <!-- Document list -->
+            <div class="doc-list" id="docList">
+              <div class="doc-loading" id="docLoading">
+                <div class="spinner-sm"></div>
+                <span>로딩 중...</span>
+              </div>
             </div>
 
-            <label class="field">
-              <span>Scene Title</span>
-              <input id="sceneTitle" value="Gate validation scene" />
-            </label>
-
-            <label class="field">
-              <span>Scene Text</span>
-              <textarea id="sceneText" rows="13"></textarea>
-            </label>
-          </section>
-
-          <section class="panel gate-panel">
-            <div class="section-head">
-              <h2>Pre-Persist Gate</h2>
-              <span id="gateDecisionBadge" class="decision decision-none">NO DECISION</span>
+            <!-- Left panel footer -->
+            <div class="lp-footer">
+              <button class="lp-footer-btn" id="addCategoryBtn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                새 범주 추가
+              </button>
+              <button class="lp-footer-btn lp-trash-btn" id="trashBtn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                휴지통
+              </button>
             </div>
-            <p id="gateMessage" class="gate-message">Run scene to evaluate approve/reject/needs-override.</p>
-            <div id="gateReasons" class="gate-reasons"></div>
-            <pre id="mutationOutput" class="output">No mutation run yet.</pre>
-          </section>
+          </aside>
 
-          <section class="panel">
-            <div class="section-head">
-              <h2>Structured Auto-Editor</h2>
-              <button id="rewriteBtn" class="btn btn-secondary">Verify + Patch</button>
+          <!-- Center Panel: Chat -->
+          <main class="center-panel">
+            <!-- Tabs -->
+            <div class="center-tabs">
+              <button class="center-tab active" data-tab="qa">AI 질의응답</button>
+              <button class="center-tab" data-tab="consistency">일관성 검수</button>
             </div>
 
-            <p class="status-line">
-              Scene -> Verifier -> Issue list -> LLM structured patch -> Targeted edit apply
-            </p>
+            <!-- QA Tab -->
+            <div class="tab-content active" id="tab-qa">
+              <!-- Document filter -->
+              <div class="filter-bar">
+                <span class="filter-label">문서 필터</span>
+                <div class="filter-chips" id="filterChips">
+                  <button class="filter-chip active" data-filter="">전체</button>
+                  <button class="filter-chip" data-filter="세계관">세계관</button>
+                  <button class="filter-chip" data-filter="캐릭터">캐릭터</button>
+                  <button class="filter-chip" data-filter="원고">원고</button>
+                  <button class="filter-chip" data-filter="연표">연표</button>
+                  <button class="filter-chip" data-filter="기준문서">기준문서</button>
+                  <button class="filter-chip" data-filter="메모">메모</button>
+                  <button class="filter-chip filter-plus">+</button>
+                </div>
+              </div>
 
-            <label class="field">
-              <span>Instructions</span>
-              <textarea id="rewriteInstructions" rows="4" placeholder="Tighten the pacing, keep canon stable, and make the dialogue more tense."></textarea>
-            </label>
+              <!-- Messages -->
+              <div class="chat-messages" id="qaMessages">
+                <div class="chat-empty" id="qaEmpty">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                  <p>업로드된 문서에 대해 질문하거나<br>아래 빠른 질문을 선택하세요.</p>
+                </div>
+              </div>
 
-            <label class="field">
-              <span>Target Tone</span>
-              <input id="rewriteTone" value="clear, controlled, cinematic" />
-            </label>
+              <!-- Quick actions -->
+              <div class="quick-actions">
+                <button class="qa-chip" data-q="세계관을 요약해주세요">세계관 요약</button>
+                <button class="qa-chip" data-q="등장인물 간의 관계를 정리해주세요">인물 관계 정리</button>
+                <button class="qa-chip" data-q="복선과 떡밥을 정리해주세요">떡밥 정리</button>
+                <button class="qa-chip" data-q="복선 중 회수된 것이 있나요?">복선 회수 여부</button>
+                <button class="qa-chip" data-q="주인공이 처음 등장하는 장면을 알려주세요">등장인물 첫 등장</button>
+              </div>
 
-            <div class="row-actions">
-              <button id="applyRewriteBtn" class="btn btn-primary">Apply Patched Text</button>
-              <span id="rewriteStatus" class="status-line">Idle.</span>
+              <!-- Chat input -->
+              <div class="chat-input-row">
+                <button class="attach-btn" id="attachBtn" title="파일 첨부">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <input class="chat-input" id="qaInput" type="text" placeholder="서사에 대해 질문해주세요..." autocomplete="off" />
+                <button class="send-btn" id="qaSend" title="전송">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                </button>
+              </div>
             </div>
 
-            <label class="field">
-              <span>Patch Decisions (JSON array)</span>
-              <textarea
-                id="patchDecisionEditor"
-                rows="7"
-                placeholder='[{"patch_id":"issue_1_cand_1","action":"accept"},{"patch_id":"issue_2_cand_1","action":"edit","edited_with":"..."}]'
-              ></textarea>
-            </label>
+            <!-- Consistency Tab -->
+            <div class="tab-content" id="tab-consistency">
 
-            <pre id="rewriteOutput" class="output compact">No structured patch yet.</pre>
-          </section>
-        </section>
+              <!-- Scrollable content area -->
+              <div class="con-panel" id="conPanel">
 
-        <aside class="pane pane-right">
-          <section class="panel">
-            <div class="section-head">
-              <h2>Consistency Check</h2>
-              <button id="consistencyBtn" class="btn btn-secondary">Check</button>
+                <!-- ── Overview (pre-run) ──────────────────────────── -->
+                <div class="con-overview" id="conOverview">
+                  <div class="con-ov-head">
+                    <div class="con-ov-title">일관성 검수 개요</div>
+                    <p class="con-ov-desc">문서 간 설정 충돌, 인물 / 연표 모순, 규정 위반 여부를 AI가 분석합니다.</p>
+                  </div>
+
+                  <!-- Section A -->
+                  <div class="con-ov-card">
+                    <div class="con-ov-card-head">
+                      <span class="con-ov-badge">A</span>
+                      <div>
+                        <div class="con-ov-card-title">일관성 검증</div>
+                        <div class="con-ov-card-desc">여러 문서 간 인물, 설정, 연표의 충돌 및 모순을 탐지합니다.</div>
+                      </div>
+                    </div>
+                    <div class="con-ov-items-label">검수 항목</div>
+                    <div class="con-ov-items">
+                      <div class="con-ov-item"><span class="con-ov-item-main">설정 충돌</span><span class="con-ov-item-sub">세계관 · 설정 · 규칙</span></div>
+                      <div class="con-ov-item"><span class="con-ov-item-main">연표 충돌</span><span class="con-ov-item-sub">시간 · 시간 · 흐름</span></div>
+                      <div class="con-ov-item"><span class="con-ov-item-main">인물 모순</span><span class="con-ov-item-sub">인물 · 관계 · 성격 · 서사</span></div>
+                    </div>
+                    <div class="con-ov-status-idle">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                      아직 검수가 실행되지 않았습니다.
+                    </div>
+                  </div>
+
+                  <!-- Section B -->
+                  <div class="con-ov-card">
+                    <div class="con-ov-card-head">
+                      <span class="con-ov-badge">B</span>
+                      <div>
+                        <div class="con-ov-card-title">규정 및 내부문서 검수</div>
+                        <div class="con-ov-card-desc">기준 문서와 내부 가이드라인을 기반으로 규정 준수 여부를 검사합니다.</div>
+                      </div>
+                    </div>
+                    <div class="con-ov-items-label">검수 항목</div>
+                    <div class="con-ov-items">
+                      <div class="con-ov-item"><span class="con-ov-item-main">규정 위반</span><span class="con-ov-item-sub">필수 규정 · 금지 사항</span></div>
+                      <div class="con-ov-item"><span class="con-ov-item-main">권고 사항</span><span class="con-ov-item-sub">표현 · 서술 · 문체 · 뉘앙스</span></div>
+                      <div class="con-ov-item"><span class="con-ov-item-main">형식 오류</span><span class="con-ov-item-sub">포맷 · 맞춤법 · 표기</span></div>
+                    </div>
+                    <div class="con-ov-status-idle">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                      아직 검수가 실행되지 않았습니다.
+                    </div>
+                  </div>
+                </div><!-- .con-overview -->
+
+                <!-- ── Results (post-run, hidden initially) ─────────── -->
+                <div class="con-results" id="conResults" style="display:none"></div>
+
+              </div><!-- .con-panel -->
+
+              <!-- ── Footer: text input + run button ─────────────── -->
+              <div class="con-footer">
+                <textarea class="con-textarea" id="consistencyInput" placeholder="검수할 서사 텍스트를 붙여넣으세요..." rows="1"></textarea>
+                <div class="con-footer-bar">
+                  <span class="con-footer-hint">Ctrl+Enter로 실행</span>
+                  <button class="con-run-btn" id="consistencySend">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                    AI 검수 실행
+                  </button>
+                </div>
+              </div>
+
+            </div><!-- #tab-consistency -->
+          </main>
+
+          <!-- Right Panel: Document Inspector -->
+          <aside class="right-panel" id="rightPanel">
+            <div class="rp-header">
+              <button class="rp-back-btn" id="rpBack" title="돌아가기">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              </button>
+              <span class="rp-title" id="rpTitle">문서</span>
+              <button class="rp-close-btn" id="rpClose" title="닫기">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
-            <label class="field">
-              <span>Narrative</span>
-              <textarea id="consistencyText" rows="7"></textarea>
-            </label>
-            <pre id="consistencyOutput" class="output compact">No consistency run yet.</pre>
-          </section>
 
-          <section class="panel">
-            <div class="section-head">
-              <h2>Query Story State</h2>
-              <button id="queryBtn" class="btn btn-secondary">Ask</button>
+            <div class="rp-tabs">
+              <button class="rp-tab" data-rptab="summary">문서 요약</button>
+              <button class="rp-tab active" data-rptab="highlights">원문 하이라이트</button>
+              <button class="rp-tab" data-rptab="meta">메타 정보</button>
             </div>
-            <label class="field">
-              <span>Question</span>
-              <input id="queryText" value="What happened to Anna?" />
-            </label>
-            <pre id="queryOutput" class="output compact">No query yet.</pre>
-          </section>
 
-          <section class="panel">
-            <h2>System Responses</h2>
-            <pre id="healthOutput" class="output compact">No health check yet.</pre>
-            <pre id="kgOutput" class="output compact">No KG summary yet.</pre>
-            <pre id="graphOutput" class="output compact">No relationship query yet.</pre>
-          </section>
-        </aside>
+            <!-- Highlights tab -->
+            <div class="rp-tab-content active" id="rptab-highlights">
+              <div class="rp-filter-row">
+                <span class="rp-filter-label">하이라이트된 원문 <span class="rp-filter-hint">(AI 참고 구절)</span></span>
+                <select class="rp-source-filter">
+                  <option>AI 근거 보기: 전체</option>
+                </select>
+                <div class="rp-pagination">
+                  <button class="rp-page-btn" id="rpPrev">‹</button>
+                  <span class="rp-page-info" id="rpPageInfo">1 / 1</span>
+                  <button class="rp-page-btn" id="rpNext">›</button>
+                </div>
+              </div>
+              <div class="rp-sections" id="rpSections">
+                <div class="rp-empty">문서를 선택하면 내용이 표시됩니다.</div>
+              </div>
+            </div>
+
+            <!-- Summary tab -->
+            <div class="rp-tab-content" id="rptab-summary">
+              <div class="rp-sections" id="rpSummary">
+                <div class="rp-empty">문서를 선택하면 요약이 표시됩니다.</div>
+              </div>
+            </div>
+
+            <!-- Meta tab -->
+            <div class="rp-tab-content" id="rptab-meta">
+              <div class="rp-sections" id="rpMeta">
+                <div class="rp-empty">메타 정보가 없습니다.</div>
+              </div>
+            </div>
+
+            <div class="rp-footer">
+              <span class="rp-file-path" id="rpFilePath"></span>
+              <div class="rp-footer-actions">
+                <button class="rp-icon-btn" title="복사">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+                <button class="rp-icon-btn" title="외부 링크">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </button>
+              </div>
+            </div>
+          </aside>
+
+        </div><!-- .body -->
       </section>
-    </main>
 
-    <script type="module" src="./app.js"></script>
-  </body>
+    </div><!-- .view-container -->
+  </div><!-- .shell -->
+
+  <!-- Category rename popover (hidden) -->
+  <div class="category-popover" id="categoryPopover">
+    <button data-cat="세계관">세계관</button>
+    <button data-cat="캐릭터">캐릭터</button>
+    <button data-cat="원고">원고</button>
+    <button data-cat="연표">연표</button>
+    <button data-cat="기준문서">기준문서</button>
+    <button data-cat="메모">메모</button>
+  </div>
+
+</div><!-- .app -->
+<script src="./app.js?v=24"></script>
+</body>
 </html>
