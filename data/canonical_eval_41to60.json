@@ -1,0 +1,1250 @@
+[
+  {
+    "chapter": 41,
+    "title": "제도 정착",
+    "elapsed": 13.8,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 14,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_trait",
+          "discovery",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 42,
+    "title": "망당산 약초 여행",
+    "elapsed": 17.1,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "백용",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "백용",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "timeline_beat",
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 43,
+    "title": "을동 조우 / 을동 격퇴와 여인 구출",
+    "elapsed": 19.6,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 0.667,
+        "detected": [
+          "길동",
+          "백소저",
+          "백용의 딸",
+          "상좌의 장수",
+          "을동 우두머리",
+          "정통 두 양인 여자"
+        ],
+        "expected": [
+          "백소저",
+          "을동",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "백소저"
+        ],
+        "false_positives": [
+          "백용의 딸",
+          "상좌의 장수",
+          "을동 우두머리",
+          "정통 두 양인 여자"
+        ],
+        "false_negatives": [
+          "을동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 27,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.5,
+        "count_range": [
+          5,
+          40
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "conflict",
+          "death",
+          "murder",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 44,
+    "title": "세 부인과 혼인",
+    "elapsed": 12.3,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "백소저",
+          "백용",
+          "정씨 부인",
+          "통씨 부인",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "백소저",
+          "백용",
+          "정씨 부인",
+          "통씨 부인",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "relationship_forms",
+          "timeline_beat"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 45,
+    "title": "제도 귀환과 번영",
+    "elapsed": 13.1,
+    "clean": {
+      "entity": {
+        "precision": 0.333,
+        "recall": 0.2,
+        "detected": [
+          "길동",
+          "백용 부처",
+          "삼 부인"
+        ],
+        "expected": [
+          "백소저",
+          "백용",
+          "정씨 부인",
+          "통씨 부인",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [
+          "백용 부처",
+          "삼 부인"
+        ],
+        "false_negatives": [
+          "백소저",
+          "백용",
+          "정씨 부인",
+          "통씨 부인"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 15,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 46,
+    "title": "부친 임종 예감",
+    "elapsed": 11.6,
+    "clean": {
+      "entity": {
+        "precision": 0.667,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "백소저",
+          "홍승상"
+        ],
+        "expected": [
+          "백소저",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "백소저"
+        ],
+        "false_positives": [
+          "홍승상"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 14,
+        "count_in_range": false,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "dialogue",
+          "discovery",
+          "scene_opens",
+          "timeline_beat"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 47,
+    "title": "부친 묘터 마련",
+    "elapsed": 11.7,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동"
+        ],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 15,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.5,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "alliance",
+          "char_trait",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 48,
+    "title": "조선으로 귀환",
+    "elapsed": 12.6,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 0.667,
+        "detected": [
+          "길동",
+          "백소저",
+          "상인",
+          "유씨 부인"
+        ],
+        "expected": [
+          "유씨 부인",
+          "춘섬",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "유씨 부인"
+        ],
+        "false_positives": [
+          "백소저",
+          "상인"
+        ],
+        "false_negatives": [
+          "춘섬"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "travel"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "dialogue",
+          "relationship_changes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 49,
+    "title": "승상 임종",
+    "elapsed": 13.7,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "detected": [
+          "길동",
+          "길현",
+          "춘섬",
+          "홍문"
+        ],
+        "expected": [
+          "유씨 부인",
+          "춘섬",
+          "홍 승상",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길현",
+          "춘섬"
+        ],
+        "false_positives": [
+          "길동",
+          "홍문"
+        ],
+        "false_negatives": [
+          "유씨 부인",
+          "홍 승상"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 16,
+        "count_in_range": false,
+        "required_covered": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "death",
+          "dialogue",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 50,
+    "title": "부친 장례와 형과의 대화",
+    "elapsed": 15.9,
+    "clean": {
+      "entity": {
+        "precision": 0.667,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "길현",
+          "소제"
+        ],
+        "expected": [
+          "홍길동",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길동",
+          "길현"
+        ],
+        "false_positives": [
+          "소제"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "dialogue",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "conflict",
+          "dialogue",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 51,
+    "title": "부친 안장과 출발",
+    "elapsed": 19.8,
+    "clean": {
+      "entity": {
+        "precision": 0.75,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "길현",
+          "대감 영위",
+          "춘섬"
+        ],
+        "expected": [
+          "춘섬",
+          "홍길동",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길동",
+          "길현",
+          "춘섬"
+        ],
+        "false_positives": [
+          "대감 영위"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 20,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "travel"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          15
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_exits",
+          "death",
+          "dialogue",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 52,
+    "title": "형과 이별",
+    "elapsed": 15.7,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "길현"
+        ],
+        "expected": [
+          "홍길동",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길동",
+          "길현"
+        ],
+        "false_positives": [],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 18,
+        "count_in_range": false,
+        "required_covered": [
+          "dialogue",
+          "travel"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "dialogue",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 53,
+    "title": "율도국 정복 결의",
+    "elapsed": 10.8,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 54,
+    "title": "율도국 출병 / 칠십여 성 함락과 격서",
+    "elapsed": 17.8,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.0,
+        "detected": [],
+        "expected": [
+          "김인수",
+          "맹춘",
+          "율도왕",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [],
+        "false_negatives": [
+          "김인수",
+          "맹춘",
+          "율도왕",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 0,
+        "count_in_range": false,
+        "required_covered": [],
+        "required_missing": [
+          "travel",
+          "world_state_change"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": []
+      },
+      "pbkd": {
+        "gate_decision": "reject",
+        "gate_approved": false,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 55,
+    "title": "율도국 전투 / 율도왕 자결과 도성 점령",
+    "elapsed": 20.2,
+    "clean": {
+      "entity": {
+        "precision": 0.6,
+        "recall": 0.75,
+        "detected": [
+          "길동",
+          "맹춘",
+          "율도왕",
+          "율도왕의 장자",
+          "한석"
+        ],
+        "expected": [
+          "김인수",
+          "맹춘",
+          "율도왕",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "맹춘",
+          "율도왕"
+        ],
+        "false_positives": [
+          "율도왕의 장자",
+          "한석"
+        ],
+        "false_negatives": [
+          "김인수"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 32,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          5,
+          40
+        ],
+        "detected_types": [
+          "alliance",
+          "capture",
+          "char_trait",
+          "character_exits",
+          "conflict",
+          "death",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 56,
+    "title": "왕위 등극 / 태평성대",
+    "elapsed": 19.7,
+    "clean": {
+      "entity": {
+        "precision": 0.556,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "김인수",
+          "맹춘",
+          "백소저",
+          "삼호걸",
+          "신왕",
+          "정통 두 부인",
+          "춘섬",
+          "홍문"
+        ],
+        "expected": [
+          "김인수",
+          "맹춘",
+          "백소저",
+          "춘섬",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "김인수",
+          "맹춘",
+          "백소저",
+          "춘섬"
+        ],
+        "false_positives": [
+          "삼호걸",
+          "신왕",
+          "정통 두 부인",
+          "홍문"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 29,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "death",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 57,
+    "title": "모친 승하 / 태자 책봉과 왕위 이양",
+    "elapsed": 18.1,
+    "clean": {
+      "entity": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "detected": [
+          "왕대비(춘섬)"
+        ],
+        "expected": [
+          "춘섬",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [
+          "왕대비(춘섬)"
+        ],
+        "false_negatives": [
+          "춘섬",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 22,
+        "count_in_range": true,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          24
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "death",
+          "discovery",
+          "relationship_forms",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 58,
+    "title": "월영산 선도 수행",
+    "elapsed": 13.5,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "detected": [
+          "백소저",
+          "태자"
+        ],
+        "expected": [
+          "백소저",
+          "홍길동"
+        ],
+        "true_positives": [
+          "백소저"
+        ],
+        "false_positives": [
+          "태자"
+        ],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 15,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.5,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 59,
+    "title": "백일승천",
+    "elapsed": 17.4,
+    "clean": {
+      "entity": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "detected": [
+          "대왕",
+          "모비",
+          "태자"
+        ],
+        "expected": [
+          "백소저",
+          "홍길동"
+        ],
+        "true_positives": [],
+        "false_positives": [
+          "대왕",
+          "모비",
+          "태자"
+        ],
+        "false_negatives": [
+          "백소저",
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_exits",
+          "discovery",
+          "relationship_changes",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 60,
+    "title": "에필로그 — 길현의 여생과 홍길동전 결말",
+    "elapsed": 15.0,
+    "clean": {
+      "entity": {
+        "precision": 0.667,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "길현",
+          "유씨 부인"
+        ],
+        "expected": [
+          "유씨 부인",
+          "홍길현"
+        ],
+        "true_positives": [
+          "길현",
+          "유씨 부인"
+        ],
+        "false_positives": [
+          "길동"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 21,
+        "count_in_range": false,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_changes",
+          "death",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  }
+]

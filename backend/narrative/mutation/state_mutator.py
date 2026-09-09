@@ -19,6 +19,7 @@ Dispatch:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -35,6 +36,49 @@ from backend.narrative.mutation.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+_NOISE_BEAT_RE = re.compile(
+    r"^Scene '[^']+' begins$"
+    r"|^Scene events recorded on timeline$"
+    r"|^Location '[^']+' is established$"
+    r"|^장면 '.+' 시작$"
+    r"|^장면 사건이 타임라인에 기록됨$"
+    r"|^'.+' 공간이 설정됨$"
+)
+
+def _is_story_beat(predicate: str) -> bool:
+    """Return True only for actual story content, not internal pipeline metadata."""
+    return "provisional:" not in predicate and not _NOISE_BEAT_RE.match(predicate)
+
+
+_KOREAN_NON_NAMES = {
+    "그", "그녀", "그는", "그가", "그의", "그녀는", "그녀가", "그녀의",
+    "그들", "그들은", "그들이", "그들의", "그것", "그것은", "그것이",
+    "나", "나는", "나의", "내가", "내", "저", "저는", "저의", "제가",
+    "너", "너는", "너의", "네가", "당신", "당신은", "당신의",
+    "우리", "우리는", "우리의", "이", "저것", "이것", "것", "수많",
+    "특히", "하지만", "그래서", "그리고", "또는", "또한", "그런데",
+    "그렇게", "하나", "이미", "오직", "모든", "각각", "서로",
+}
+
+
+_KOREAN_POSSESSIVE = "의"
+_KOREAN_ROLE_SUFFIXES = {"부하", "부관", "병사", "신하", "기사", "경비", "경호원", "수하", "졸개", "수하인"}
+
+
+def _is_valid_character_name(name: str) -> bool:
+    stripped = name.strip()
+    if not stripped or len(stripped) < 2:
+        return False
+    if stripped.lower() in _KOREAN_NON_NAMES:
+        return False
+    # "X의 Y" pattern (X's Y) = description not a name, unless Y is a known proper noun marker
+    if _KOREAN_POSSESSIVE in stripped:
+        last_token = stripped.split(_KOREAN_POSSESSIVE)[-1].strip()
+        if last_token in _KOREAN_ROLE_SUFFIXES or not last_token:
+            return False
+    return True
+
 
 # Events that change character vital status
 _VITAL_STATUS_MAP: dict[EventType, str] = {
@@ -83,7 +127,7 @@ class StateMutator:
     # Public interface
     # ------------------------------------------------------------------
 
-    def apply(self, events: list[NarrativeEvent], scene_title: str | None = None) -> MutationResult:
+    def apply(self, events: list[NarrativeEvent], scene_title: str | None = None, scene_text: str | None = None) -> MutationResult:
         result = MutationResult(
             scene_id=None,
             events_applied=[],
@@ -105,10 +149,10 @@ class StateMutator:
         # Persist the scene row when we have characters
         if scene_title and char_names_in_scene:
             try:
-                scene = self._scenes.create(
+                scene = self._scenes.get_or_create(
                     title=scene_title,
-                    summary=None,
-                    beats=[e.predicate for e in events if e.source_scene == scene_title],
+                    summary=scene_text or None,
+                    beats=[e.predicate for e in events if e.source_scene == scene_title and _is_story_beat(e.predicate)],
                     characters=char_names_in_scene,
                 )
                 result.scene_id = scene.id
@@ -224,7 +268,9 @@ class StateMutator:
                 self._characters.upsert(char.id, fields)
             return char.id
         else:
-            from uuid import uuid4
+            if not _is_valid_character_name(name):
+                logger.debug("Skipping upsert for non-name token: %r", name)
+                return ""
             char_id = uuid4().hex
             meta: dict[str, Any] = dict(attributes)
             if location:

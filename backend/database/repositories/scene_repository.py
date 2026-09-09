@@ -18,6 +18,10 @@ class SceneRepository:
     def count(self) -> int:
         return len(self.list())
 
+    def get_by_title(self, title: str) -> Scene | None:
+        stmt = select(Scene).where(Scene.title == title).limit(1)
+        return self.db.scalars(stmt).first()
+
     def create(self, title: str, summary: str | None, beats: list[str], characters: list[str]) -> Scene:
         scene = Scene(title=title, summary=summary, beats=beats, characters=characters)
         self.db.add(scene)
@@ -26,3 +30,10 @@ class SceneRepository:
             self.db.commit()
         self.db.refresh(scene)
         return scene
+
+    def get_or_create(self, title: str, summary: str | None, beats: list[str], characters: list[str]) -> Scene:
+        """Return existing scene by title, or create if not found. Prevents duplicate scene rows."""
+        existing = self.get_by_title(title)
+        if existing is not None:
+            return existing
+        return self.create(title=title, summary=summary, beats=beats, characters=characters)

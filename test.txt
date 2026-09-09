@@ -1,4 +1,0 @@
-#python3 -m venv narrativeos && source narrativeos/bin/activate
-
-#conda activate narrativeos
-#http://127.0.0.1:4173

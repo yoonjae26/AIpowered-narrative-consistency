@@ -71,11 +71,15 @@ class ConsistencyChecker:
         mutation_result: MutationResult,
         events: list[NarrativeEvent],
         scene_text: str = "",
+        dry_run: bool = False,
     ) -> ConsistencyReport:
         report = ConsistencyReport()
         scene = next((e.source_scene for e in events if e.source_scene), None)
 
-        self._r1_dead_reappears(events, report, scene)
+        # R1 relies on sequential DB state; skip in dry_run (isolation testing)
+        # where DB may reflect future scenes not yet reached in story order.
+        if not dry_run:
+            self._r1_dead_reappears(events, report, scene)
         self._r2_canon_resurrection(events, report, scene)
         self._r3_impossible_location(events, report, scene)
         self._r5_orphan_relationships(events, report, scene)
@@ -94,9 +98,19 @@ class ConsistencyChecker:
     def _r1_dead_reappears(
         self, events: list[NarrativeEvent], report: ConsistencyReport, scene: str | None
     ) -> None:
+        all_chars = self._characters.list()
+
+        # Names of living characters — used to suppress alias-confusion false positives.
+        # e.g. '길동' stored as DEAD (short-name clone) should not block when '홍길동' is alive.
+        alive_lowers: set[str] = {
+            c.name.lower()
+            for c in all_chars
+            if (c.status or "").lower() != CharacterStatus.DEAD.value
+        }
+
         dead_in_db = {
             c.name.lower(): c.name
-            for c in self._characters.list()
+            for c in all_chars
             if (c.status or "").lower() == CharacterStatus.DEAD.value
         }
         if not dead_in_db:
@@ -109,6 +123,15 @@ class ConsistencyChecker:
         }
 
         for name_lower, canonical in dead_in_db.items():
+            # Skip: this dead name is a suffix of an alive canonical name.
+            # This prevents short-name alias deaths (e.g. '길동' from a clone arc)
+            # from blocking scenes where the canonical character '홍길동' still lives.
+            if any(
+                alive.endswith(name_lower) and alive != name_lower and len(alive) > len(name_lower)
+                for alive in alive_lowers
+            ):
+                continue
+
             appears = any(
                 e.subject.lower() == name_lower and
                 e.event_type in (EventType.CHARACTER_APPEARS, EventType.TRAVEL,
@@ -117,7 +140,7 @@ class ConsistencyChecker:
             )
             if appears and name_lower not in resurrection_in_events:
                 report.add_error(
-                    f"{canonical} reappears but was previously marked as dead.",
+                    f"{canonical}은(는) ���미 사망한 인물로 기록되어 있으나 장면에 다시 등장합니다.",
                     rule_id="dead_character_reappears",
                     entities=[canonical],
                     scene=scene,
@@ -135,8 +158,7 @@ class ConsistencyChecker:
         for event in events:
             if event.event_type == EventType.RESURRECTION:
                 report.add_error(
-                    f"Resurrection of {event.subject} may violate established world canon "
-                    "(resurrection forbidden).",
+                    f"{event.subject}의 부활은 세계관 규칙(부활 금지)에 위배될 수 있습니다.",
                     rule_id="canon_violation_resurrection",
                     entities=[event.subject],
                     scene=scene,
@@ -149,13 +171,13 @@ class ConsistencyChecker:
     def _r3_impossible_location(
         self, events: list[NarrativeEvent], report: ConsistencyReport, scene: str | None
     ) -> None:
-        # Group travel/appears events by character -> collect distinct locations
+        # Only CHARACTER_APPEARS counts as the character being at a location.
+        # TRAVEL = moving between locations (expected to have different from/to).
+        # SCENE_OPENS = scene-level setting, not a character's specific position.
+        PRESENCE_TYPES = (EventType.CHARACTER_APPEARS,)
         char_locations: dict[str, list[str]] = {}
         for event in events:
-            if event.location and event.event_type in (
-                EventType.CHARACTER_APPEARS, EventType.TRAVEL,
-                EventType.SCENE_OPENS, EventType.WORLD_STATE_CHANGE,
-            ):
+            if event.location and event.event_type in PRESENCE_TYPES:
                 char_locations.setdefault(event.subject, [])
                 if event.location not in char_locations[event.subject]:
                     char_locations[event.subject].append(event.location)
@@ -163,8 +185,7 @@ class ConsistencyChecker:
         for char, locs in char_locations.items():
             if len(locs) >= 2:
                 report.add_error(
-                    f"{char} appears in two different locations simultaneously: "
-                    f"{locs[0]} and {locs[1]}.",
+                    f"{char}이(가) 같은 시점에 두 장소({locs[0]}, {locs[1]})에 동시에 등장합니다.",
                     rule_id="impossible_location",
                     entities=[char],
                     scene=scene,
@@ -192,7 +213,7 @@ class ConsistencyChecker:
             for name in [event.subject, event.target]:
                 if name and name.lower() not in known_names:
                     report.add_warning(
-                        f"Relationship references '{name}' which does not exist in the character database.",
+                        f"관계 이벤트가 캐릭터 데이터베이스에 존재하지 않는 인물 '{name}'을(를) 참조합니다.",
                         rule_id="orphan_relationship",
                         entities=[name],
                         scene=scene,
@@ -211,7 +232,7 @@ class ConsistencyChecker:
         for name_lower, ids in names.items():
             if len(ids) > 1:
                 report.add_warning(
-                    f"Multiple characters share the name '{name_lower}'. This may cause consistency errors.",
+                    f"동일한 이름 '{name_lower}'을(를) 가진 인물이 여럿 존재합니다. 일관성 오류가 발생할 수 있습니다.",
                     rule_id="duplicate_character_name",
                     entities=[name_lower],
                     scene=scene,

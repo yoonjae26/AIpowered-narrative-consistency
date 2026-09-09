@@ -3,10 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.llm.providers.base import BaseLLMProvider, LLMMessage
 from backend.narrative.mutation.models import EventType, NarrativeEvent
+
+if TYPE_CHECKING:
+    from backend.narrative.reasoning.pbkd_reasoner import PBKDInference
 
 
 @dataclass(slots=True)
@@ -38,12 +41,33 @@ class SemanticValidator:
 		references: list[str] | None = None,
 		events: list[NarrativeEvent] | None = None,
 		character_memories: dict[str, Any] | None = None,
+		pbkd_inferences: list[PBKDInference] | None = None,
+		kg_conflicts: list[dict[str, Any]] | None = None,
 	) -> SemanticValidationResult:
 		references = references or []
 		events = events or []
 		issues = self._heuristic_issues(text, events, references, character_memories or {})
 		notes = [self._reference_note(text, references)]
 		provider_used = None
+
+		if pbkd_inferences:
+			pbkd_issues = self._pbkd_issues(pbkd_inferences)
+			issues.extend(pbkd_issues)
+			contradiction_count = sum(
+				1 for i in pbkd_inferences
+				if getattr(i, "verdict", "") == "contradicts"
+			)
+			notes.append(
+				f"PBKD reasoning: {len(pbkd_inferences)} inferences, "
+				f"{contradiction_count} contradiction(s)."
+			)
+
+		if kg_conflicts:
+			kg_issues = self._kg_issues(kg_conflicts)
+			issues.extend(kg_issues)
+			notes.append(
+				f"KG conflict detection: {len(kg_conflicts)} relationship contradiction(s)."
+			)
 
 		if self._llm is not None:
 			try:
@@ -64,6 +88,66 @@ class SemanticValidator:
 			notes=notes,
 			provider_used=provider_used,
 		)
+
+	def _pbkd_issues(self, inferences: list[PBKDInference]) -> list[SemanticIssue]:
+		"""Convert PBKDInference objects to SemanticIssue objects."""
+		issues: list[SemanticIssue] = []
+		for inf in inferences:
+			if getattr(inf, "verdict", "") != "contradicts":
+				continue
+
+			raw_severity = getattr(inf, "severity", "minor")
+			if raw_severity == "critical":
+				severity = "error"
+			elif raw_severity == "major":
+				severity = "warning"
+			else:
+				severity = "info"
+
+			dim_label = {
+				"P": "Personality", "B": "Belief",
+				"K": "Knowledge", "D": "Desire",
+			}.get(getattr(inf, "dimension", "B"), "PBKD")
+
+			issues.append(SemanticIssue(
+				rule_id="pbkd_contradiction",
+				category="pbkd_contradiction",
+				severity=severity,
+				message=f"[PBKD/{dim_label}] {getattr(inf, 'chain', '')}",
+				evidence=[getattr(inf, "action", "")] + list(getattr(inf, "evidence", [])),
+				entities=[getattr(inf, "character", "")],
+				source="pbkd_reasoner",
+			))
+		return issues
+
+	def _kg_issues(self, conflicts: list[dict[str, Any]]) -> list[SemanticIssue]:
+		"""Convert KG contradiction dicts to SemanticIssue objects."""
+		issues: list[SemanticIssue] = []
+		for conflict in conflicts:
+			raw_severity = str(conflict.get("severity") or "minor")
+			if raw_severity == "critical":
+				severity = "error"
+			elif raw_severity == "major":
+				severity = "warning"
+			else:
+				severity = "info"
+
+			char_a = str(conflict.get("character_a") or "")
+			char_b = str(conflict.get("character_b") or "")
+			stored = str(conflict.get("stored_relation") or "")
+			new_event = str(conflict.get("new_event") or "")
+			chain = str(conflict.get("chain") or "")
+
+			issues.append(SemanticIssue(
+				rule_id="kg_relationship_conflict",
+				category="kg_conflict",
+				severity=severity,
+				message=f"[KG/{stored}→{new_event}] {chain}",
+				evidence=[f"{char_a} {stored} {char_b}", f"new: {new_event}"],
+				entities=[char_a, char_b],
+				source="knowledge_graph",
+			))
+		return issues
 
 	def _heuristic_issues(
 		self,
@@ -252,6 +336,7 @@ class SemanticValidator:
 			"",
 			"Return ONLY a JSON array of issues with keys: category, severity, message, evidence, entities.",
 			"Allowed categories: emotional_mismatch, dialogue_inconsistency, unnatural_progression.",
+			"Allowed severities: warning, info. Do NOT use 'error'.",
 		])
 		response = self._llm.complete([
 			LLMMessage(role="system", content="You are a semantic narrative validator. Detect subtle emotional mismatch, dialogue inconsistency, and unnatural progression. Return JSON only."),
@@ -272,10 +357,14 @@ class SemanticValidator:
 		issues: list[SemanticIssue] = []
 		for item in payload:
 			category = str(item.get("category") or "unnatural_progression")
+			raw_severity = str(item.get("severity") or "warning").lower()
+			# LLM-sourced issues are advisory only — cap at "warning" so they
+			# never trigger a hard REJECT in _resolve_gate_decision.
+			severity = raw_severity if raw_severity in ("warning", "info") else "warning"
 			issues.append(SemanticIssue(
 				rule_id=self._rule_id_for(category),
 				category=category,
-				severity=str(item.get("severity") or "warning"),
+				severity=severity,
 				message=str(item.get("message") or "LLM flagged a semantic issue."),
 				evidence=[str(part) for part in item.get("evidence", [])],
 				entities=[str(part) for part in item.get("entities", [])],

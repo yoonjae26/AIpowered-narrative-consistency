@@ -1,0 +1,46 @@
+[
+  {
+    "id": "e666539c",
+    "name": "서사과부하팀.pdf",
+    "category": "메모",
+    "size_label": "342KB",
+    "time_label": "방금 전",
+    "selected": false,
+    "source": "upload",
+    "file_path": "e666539c_서사과부하팀.pdf",
+    "created_at": "2026-08-02T13:07:40.559059+00:00"
+  },
+  {
+    "id": "18d78a7f",
+    "name": "복선_메모.md",
+    "category": "메모",
+    "size_label": "579B",
+    "time_label": "방금 전",
+    "selected": true,
+    "source": "upload",
+    "file_path": "18d78a7f_복선_메모.md",
+    "created_at": "2026-08-02T12:02:31.655410+00:00"
+  },
+  {
+    "id": "1f6011f3",
+    "name": "연표_주요사건.txt",
+    "category": "연표",
+    "size_label": "694B",
+    "time_label": "방금 전",
+    "selected": true,
+    "source": "upload",
+    "file_path": "1f6011f3_연표_주요사건.txt",
+    "created_at": "2026-08-02T12:02:31.615322+00:00"
+  },
+  {
+    "id": "101eb334",
+    "name": "세계관_설정.txt",
+    "category": "세계관",
+    "size_label": "606B",
+    "time_label": "방금 전",
+    "selected": true,
+    "source": "upload",
+    "file_path": "101eb334_세계관_설정.txt",
+    "created_at": "2026-08-02T12:02:31.591890+00:00"
+  }
+]

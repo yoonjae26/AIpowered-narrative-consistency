@@ -1,0 +1,339 @@
+[
+  {
+    "chapter": 55,
+    "title": "율도국 전투 / 율도왕 자결과 도성 점령",
+    "elapsed": 12.2,
+    "clean": {
+      "entity": {
+        "precision": 0.6,
+        "recall": 0.75,
+        "detected": [
+          "길동",
+          "맹춘",
+          "율도왕",
+          "율도왕의 장자",
+          "한석"
+        ],
+        "expected": [
+          "김인수",
+          "맹춘",
+          "율도왕",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "맹춘",
+          "율도왕"
+        ],
+        "false_positives": [
+          "율도왕의 장자",
+          "한석"
+        ],
+        "false_negatives": [
+          "김인수"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 33,
+        "count_in_range": true,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          5,
+          40
+        ],
+        "detected_types": [
+          "capture",
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "character_exits",
+          "conflict",
+          "death",
+          "discovery",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 56,
+    "title": "왕위 등극 / 태평성대",
+    "elapsed": 14.0,
+    "clean": {
+      "entity": {
+        "precision": 0.625,
+        "recall": 1.0,
+        "detected": [
+          "길동",
+          "김인수",
+          "맹춘",
+          "백소저",
+          "삼호걸",
+          "정통 두 부인",
+          "춘섬",
+          "홍문"
+        ],
+        "expected": [
+          "김인수",
+          "맹춘",
+          "백소저",
+          "춘섬",
+          "홍길동"
+        ],
+        "true_positives": [
+          "길동",
+          "김인수",
+          "맹춘",
+          "백소저",
+          "춘섬"
+        ],
+        "false_positives": [
+          "삼호걸",
+          "정통 두 부인",
+          "홍문"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 32,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          4,
+          30
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "character_appears",
+          "death",
+          "scene_opens",
+          "timeline_beat",
+          "travel",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 57,
+    "title": "모친 승하 / 태자 책봉과 왕위 이양",
+    "elapsed": 11.0,
+    "clean": {
+      "entity": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "detected": [
+          "왕대비",
+          "춘섬"
+        ],
+        "expected": [
+          "춘섬",
+          "홍길동"
+        ],
+        "true_positives": [
+          "왕대비",
+          "춘섬"
+        ],
+        "false_positives": [],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 23,
+        "count_in_range": true,
+        "required_covered": [
+          "char_trait",
+          "timeline_beat"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          24
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "character_changes",
+          "death",
+          "relationship_changes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 58,
+    "title": "월영산 선도 수행",
+    "elapsed": 8.8,
+    "clean": {
+      "entity": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "detected": [
+          "백소저",
+          "태자"
+        ],
+        "expected": [
+          "백소저",
+          "홍길동"
+        ],
+        "true_positives": [
+          "백소저"
+        ],
+        "false_positives": [
+          "태자"
+        ],
+        "false_negatives": [
+          "홍길동"
+        ],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 15,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat"
+        ],
+        "required_missing": [
+          "travel"
+        ],
+        "forbidden_found": [],
+        "event_recall": 0.5,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_trait",
+          "character_appears",
+          "relationship_forms",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  },
+  {
+    "chapter": 59,
+    "title": "백일승천",
+    "elapsed": 10.1,
+    "clean": {
+      "entity": {
+        "precision": 0.667,
+        "recall": 1.0,
+        "detected": [
+          "대왕",
+          "모비",
+          "태자"
+        ],
+        "expected": [
+          "백소저",
+          "홍길동"
+        ],
+        "true_positives": [
+          "대왕",
+          "모비"
+        ],
+        "false_positives": [
+          "태자"
+        ],
+        "false_negatives": [],
+        "forbidden_detected": []
+      },
+      "events": {
+        "count": 17,
+        "count_in_range": false,
+        "required_covered": [
+          "timeline_beat",
+          "world_state_change"
+        ],
+        "required_missing": [],
+        "forbidden_found": [],
+        "event_recall": 1.0,
+        "count_range": [
+          3,
+          12
+        ],
+        "detected_types": [
+          "char_emotion",
+          "char_trait",
+          "discovery",
+          "scene_closes",
+          "scene_opens",
+          "timeline_beat",
+          "world_state_change"
+        ]
+      },
+      "pbkd": {
+        "gate_decision": "approve",
+        "gate_approved": true,
+        "detected_contradictions": 0,
+        "expected_contradictions": 0,
+        "pbkd_correct": true,
+        "inferences_count": 0
+      }
+    },
+    "adversarial": null
+  }
+]

@@ -53,6 +53,7 @@ from backend.narrative.reality import (
     validate_typed_event,
 )
 from backend.narrative.query_system import NarrativeQuerySystem
+from backend.narrative.reasoning import PBKDReasoner
 from backend.narrative.relationships.graph import RelationshipGraph
 from backend.narrative.timeline import TimelineEngine
 from backend.narrative.warnings import WarningGenerator
@@ -137,6 +138,7 @@ class NarrativeStateMutationEngine:
             lore_manager=LoreManager(lore_repo) if lore_repo is not None else None,
         )
         self._semantic    = SemanticValidator(llm_provider=llm_provider)
+        self._pbkd_reasoner = PBKDReasoner(llm_provider=llm_provider)
         self._agents      = MultiAgentNarrativeAnalyzer(
             lore_agent=LoreAgent(llm_provider=llm_provider),
             character_agent=CharacterAgent(llm_provider=llm_provider),
@@ -181,6 +183,8 @@ class NarrativeStateMutationEngine:
         branch_name = str(context.get("branch") or self._vcs.current_branch())
         scene_title: str | None = context.get("scene_title") or context.get("title")
         canon_rules: dict = context.get("canon_rules") or {}
+        # dry_run=True: run full pipeline (extraction, gate, PBKD) but skip all DB writes
+        dry_run = bool(context.get("dry_run", False))
 
         # Allow per-call canon rule override
         if canon_rules:
@@ -259,7 +263,17 @@ class NarrativeStateMutationEngine:
                 ),
                 verification_events_preflight,
                 scene_text,
+                dry_run=dry_run,
             )
+
+            # PBKD Reasoning: infer character behavior consistency from author-defined PBKD
+            logger.info("Pipeline[3-PBKD]: reasoning from PBKD profile (%d chars)", len(verified_character_names))
+            pbkd_inferences = self._pbkd_reasoner.reason(
+                scene_text,
+                verified_character_names,
+                self._character_repo,
+            )
+
             deterministic_bundle = self._deterministic.analyze(
                 scene_text,
                 references=semantic_references,
@@ -271,6 +285,7 @@ class NarrativeStateMutationEngine:
                 chronology_conflicts=chrono_report.conflicts,
                 flashback_count=len(chrono_report.flashbacks),
                 flash_forward_count=len(chrono_report.flash_forwards),
+                pbkd_inferences=pbkd_inferences,
             )
             preflight_semantic_result = deterministic_bundle.semantic_result
             preflight_multi_agent_report = deterministic_bundle.multi_agent_report
@@ -303,6 +318,54 @@ class NarrativeStateMutationEngine:
                     "status": "pending",
                     "cache_hit": False,
                 }
+
+            # PBKD issues must be applied AFTER cache restoration —
+            # they depend on live DB state and must never be suppressed by a cache hit.
+            if pbkd_inferences:
+                pbkd_gate_issues = self._semantic._pbkd_issues(pbkd_inferences)
+                if pbkd_gate_issues:
+                    existing_keys = {
+                        (iss.rule_id, iss.message) for iss in preflight_semantic_result.issues
+                    }
+                    fresh = [
+                        iss for iss in pbkd_gate_issues
+                        if (iss.rule_id, iss.message) not in existing_keys
+                    ]
+                    preflight_semantic_result.issues.extend(fresh)
+
+            # Pipeline[3-KG]: query accumulated KG for relationship contradictions.
+            # Only check relationship-type events (alliance, betrayal, etc.) where
+            # both subject and target are characters.
+            logger.info("Pipeline[3-KG]: checking accumulated knowledge graph for relationship conflicts")
+            from backend.narrative.mutation.models import EventType as _ET
+            _KG_CHECK_TYPES = {
+                _ET.ALLIANCE, _ET.BETRAYAL, _ET.CONFLICT,
+                _ET.MARRIAGE, _ET.MURDER, _ET.RELATIONSHIP_FORMS,
+            }
+            kg_events_for_check = [
+                {
+                    "event_type": e.event_type.value if hasattr(e.event_type, "value") else str(e.event_type),
+                    "subject": e.subject,
+                    "subject_type": "character",
+                    "target": e.target,
+                    "target_type": "character",
+                }
+                for e in verification_events_preflight
+                if e.target and e.event_type in _KG_CHECK_TYPES
+            ]
+            kg_conflicts = self._knowledge_graph.detect_scene_contradictions(kg_events_for_check)
+            if kg_conflicts:
+                kg_gate_issues = self._semantic._kg_issues(kg_conflicts)
+                if kg_gate_issues:
+                    existing_keys_kg = {
+                        (iss.rule_id, iss.message) for iss in preflight_semantic_result.issues
+                    }
+                    fresh_kg = [
+                        iss for iss in kg_gate_issues
+                        if (iss.rule_id, iss.message) not in existing_keys_kg
+                    ]
+                    preflight_semantic_result.issues.extend(fresh_kg)
+                    logger.info("Pipeline[3-KG]: %d KG conflicts injected into gate issues", len(fresh_kg))
 
             gate = self._resolve_gate_decision(
                 allow_canon_override=allow_canon_override,
@@ -465,6 +528,23 @@ class NarrativeStateMutationEngine:
                             for name, memory in preflight_character_memories.items()
                         },
                     },
+                    "pbkd_reasoning": {
+                        "inferences": [
+                            {
+                                "character": inf.character,
+                                "action": inf.action,
+                                "verdict": inf.verdict,
+                                "dimension": inf.dimension,
+                                "chain": inf.chain,
+                                "severity": inf.severity,
+                            }
+                            for inf in pbkd_inferences
+                        ],
+                        "contradiction_count": sum(
+                            1 for inf in pbkd_inferences if inf.verdict == "contradicts"
+                        ),
+                    },
+                    "kg_conflicts": kg_conflicts,
                     "meta": {
                         "response_version": "v2_compact",
                         "rejected_before_persist": True,
@@ -495,12 +575,21 @@ class NarrativeStateMutationEngine:
                 return rejection_payload
 
             # 3+4. State Mutation + Persistence
-            logger.info("Pipeline[3]: applying %d events", len(events))
-            mutation_result = self._mutator.apply(events, scene_title=scene_title)
+            logger.info("Pipeline[3]: applying %d events%s", len(events), " (dry_run — no DB writes)" if dry_run else "")
+            if dry_run:
+                mutation_result = MutationResult(
+                    scene_id=None,
+                    events_applied=list(events),
+                    characters_upserted=[],
+                    timeline_events_created=[],
+                    consistency_warnings=[],
+                )
+            else:
+                mutation_result = self._mutator.apply(events, scene_title=scene_title, scene_text=scene_text)
 
             logger.info("Pipeline[3.5]: updating character memory")
-            character_memories = self._char_memory.update_from_events(events)
-            promotion_summary = self._char_memory.promote_pending_traits()
+            character_memories = self._char_memory.update_from_events(events) if not dry_run else {}
+            promotion_summary = self._char_memory.promote_pending_traits() if not dry_run else {}
             verification_events = _filter_events_for_known_characters(events, verified_name_set)
             verification_character_memories = {
                 name: memory
@@ -513,11 +602,12 @@ class NarrativeStateMutationEngine:
             timeline_entries, chrono_report = self._timeline.process(events, scene_text)
 
             logger.info("Pipeline[4.5]: syncing narrative memory")
-            self._memory.sync_after_mutation(
-                scene_title=scene_title,
-                character_names=list(character_memories.keys()),
-                events=events,
-            )
+            if not dry_run:
+                self._memory.sync_after_mutation(
+                    scene_title=scene_title,
+                    character_names=list(character_memories.keys()),
+                    events=events,
+                )
             memory_context = self._memory.build_context(
                 " ".join([scene_text, scene_title or "", " ".join(e.subject for e in events)]).strip(),
                 limit=int(context.get("memory_limit", 8)),
@@ -546,6 +636,7 @@ class NarrativeStateMutationEngine:
                 chronology_conflicts=chrono_report.conflicts,
                 flashback_count=len(chrono_report.flashbacks),
                 flash_forward_count=len(chrono_report.flash_forwards),
+                pbkd_inferences=pbkd_inferences,
             )
             semantic_references = deterministic_bundle.normalized_references
             scene_hash = build_scene_analysis_hash(scene_text, scene_title, branch_name, semantic_references)
@@ -614,49 +705,55 @@ class NarrativeStateMutationEngine:
                     }
 
             logger.info("Pipeline[4.7]: event sourcing + version control")
-            commit_result = self._vcs.append_commit(
-                title=scene_title or "Scene commit",
-                events=events,
-                derived_state={},
-            )
-
-            typed_events = _build_typed_events(events=events, event_ids=commit_result["event_ids"])
-            ontology_registry, ontology_errors, typed_relationships = _build_ontology_projection(
-                entities=entities,
-                typed_events=typed_events,
-            )
-            graph_events = [item for item in typed_events if item.event_type not in _GRAPH_META_EVENT_TYPES]
-            event_timestamps = {
-                event_id: str(getattr(event, "timestamp", ""))
-                for event_id, event in zip(commit_result["event_ids"], events)
-            }
-            self._knowledge_graph.integrate_scene(
-                typed_events=[
-                    {
-                        "event_id": item.event_id,
-                        "event_type": item.event_type,
-                        "subject": item.subject,
-                        "subject_type": item.subject_type.value,
-                        "predicate": item.predicate,
-                        "target": item.target,
-                        "target_type": item.target_type.value if item.target_type is not None else None,
-                        "location": item.location,
-                        "happened_at": event_timestamps.get(item.event_id, ""),
-                    }
-                    for item in graph_events
-                ],
-                scene_title=None,
-            )
-            for character_name, memory in character_memories.items():
-                self._knowledge_graph.integrate_character_memory(
-                    character_name=character_name,
-                    memory=memory.as_dict() if hasattr(memory, "as_dict") else dict(memory),
-                    scene_title=scene_title,
+            if not dry_run:
+                commit_result = self._vcs.append_commit(
+                    title=scene_title or "Scene commit",
+                    events=events,
+                    derived_state={},
                 )
+                typed_events = _build_typed_events(events=events, event_ids=commit_result["event_ids"])
+                ontology_registry, ontology_errors, typed_relationships = _build_ontology_projection(
+                    entities=entities,
+                    typed_events=typed_events,
+                )
+                graph_events = [item for item in typed_events if item.event_type not in _GRAPH_META_EVENT_TYPES]
+                event_timestamps = {
+                    event_id: str(getattr(event, "timestamp", ""))
+                    for event_id, event in zip(commit_result["event_ids"], events)
+                }
+                self._knowledge_graph.integrate_scene(
+                    typed_events=[
+                        {
+                            "event_id": item.event_id,
+                            "event_type": item.event_type,
+                            "subject": item.subject,
+                            "subject_type": item.subject_type.value,
+                            "predicate": item.predicate,
+                            "target": item.target,
+                            "target_type": item.target_type.value if item.target_type is not None else None,
+                            "location": item.location,
+                            "happened_at": event_timestamps.get(item.event_id, ""),
+                        }
+                        for item in graph_events
+                    ],
+                    scene_title=None,
+                )
+                for character_name, memory in character_memories.items():
+                    self._knowledge_graph.integrate_character_memory(
+                        character_name=character_name,
+                        memory=memory.as_dict() if hasattr(memory, "as_dict") else dict(memory),
+                        scene_title=scene_title,
+                    )
+            else:
+                commit_result = {"branch": branch_name, "event_ids": [], "derived_state": {}, "derived_state_checksum": "", "snapshot_id": ""}
+                typed_events = []
+                ontology_registry = {}
+                ontology_errors = []
+                typed_relationships = []
 
             # 6. Consistency Check
             logger.info("Pipeline[5]: running consistency checks")
-            consistency_report = self._checker.check(mutation_result, verification_events, scene_text)
+            consistency_report = self._checker.check(mutation_result, verification_events, scene_text, dry_run=dry_run)
             semantic_warnings = [issue.message for issue in semantic_result.issues if issue.severity != "error"]
             semantic_errors = [issue.message for issue in semantic_result.issues if issue.severity == "error"]
             explainability = self._reasoning.build(
@@ -701,9 +798,9 @@ class NarrativeStateMutationEngine:
                 for issue in semantic_result.issues
             )
 
-            replay_verification = self._vcs.verify_branch_replay(branch=commit_result["branch"])
+            replay_verification = {} if dry_run else self._vcs.verify_branch_replay(branch=commit_result["branch"])
 
-            if self._db is not None:
+            if self._db is not None and not dry_run:
                 self._db.commit()
 
             success_payload: dict[str, Any] = {
@@ -730,15 +827,15 @@ class NarrativeStateMutationEngine:
                     "event_ids": commit_result["event_ids"],
                     "derived_state": commit_result["derived_state"],
                     "derived_state_checksum": commit_result["derived_state_checksum"],
-                    "replay_determinism": self._vcs.replay_determinism_report(branch=commit_result["branch"]),
+                    "replay_determinism": {} if dry_run else self._vcs.replay_determinism_report(branch=commit_result["branch"]),
                     "branch_replay_verification": replay_verification,
                 },
                 "version_control": {
                     "snapshot_id": commit_result["snapshot_id"],
                     "branch": commit_result["branch"],
-                    "snapshot_integrity": self._vcs.verify_snapshot_integrity(commit_result["snapshot_id"]),
+                    "snapshot_integrity": {} if dry_run else self._vcs.verify_snapshot_integrity(commit_result["snapshot_id"]),
                 },
-                "ontology": {
+                "ontology": {} if dry_run else {
                     "entity_registry": ontology_registry.as_payload(),
                     "typed_events": [
                         {
@@ -768,8 +865,8 @@ class NarrativeStateMutationEngine:
                 },
                 "reasoning": explainability,
                 "knowledge_graph": {
-                    "summary": self._knowledge_graph.summary(),
-                    "scene_projection": _scene_graph_projection(graph_events),
+                    "summary": {} if dry_run else self._knowledge_graph.summary(),
+                    "scene_projection": [] if dry_run else _scene_graph_projection(graph_events),
                 },
                 "memory": {
                     "retrieved": memory_context,
@@ -798,6 +895,23 @@ class NarrativeStateMutationEngine:
                         for issue in drift_issues
                     ],
                 },
+                "pbkd_reasoning": {
+                    "inferences": [
+                        {
+                            "character": inf.character,
+                            "action": inf.action,
+                            "verdict": inf.verdict,
+                            "dimension": inf.dimension,
+                            "chain": inf.chain,
+                            "severity": inf.severity,
+                        }
+                        for inf in pbkd_inferences
+                    ],
+                    "contradiction_count": sum(
+                        1 for inf in pbkd_inferences if inf.verdict == "contradicts"
+                    ),
+                },
+                "kg_conflicts": kg_conflicts,
                 "semantic_validation": {
                     "score": semantic_result.score,
                     "provider_used": semantic_result.provider_used,
@@ -1024,6 +1138,44 @@ class NarrativeStateMutationEngine:
             "evidence": answer.evidence,
         }
 
+    def retrieve_character_memories(
+        self,
+        query_text: str,
+        character_name: str,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        """Direct RAG retrieval scoped to a character — bypasses query routing.
+
+        Returns evidence items in the same format as semantic_query so the
+        Memory panel renders them correctly ({id, source_type, score, content, title}).
+        """
+        self._memory.ensure_ready()
+        hits = self._memory.search_hierarchy(
+            query_text,
+            character_name=character_name,
+            limit=limit,
+        )
+        evidence = [
+            {
+                "id": hit.id,
+                "source_type": hit.source_type,
+                "score": round(hit.score, 4),
+                "content": hit.content,
+                "title": (
+                    hit.metadata.get("title")
+                    or hit.metadata.get("scene_title")
+                    or hit.source_type
+                ),
+            }
+            for hit in hits
+        ]
+        return {
+            "query": query_text,
+            "character_filter": character_name,
+            "answer": f"{character_name}의 기억 {len(evidence)}건 검색됨.",
+            "evidence": evidence,
+        }
+
     def relationship_summary(self, character_id: str) -> dict[str, Any]:
         return self._graph.summary(character_id)
 
@@ -1048,6 +1200,7 @@ class NarrativeStateMutationEngine:
                 "relationship_type": edge.relationship_type.value,
                 "strength": edge.strength,
                 "dimensions": edge.dimensions,
+                "notes": edge.notes,
             }
             for edge in self._graph.query_by_dimension(dimension, minimum=minimum)
         ]
@@ -1110,12 +1263,12 @@ class NarrativeStateMutationEngine:
             "non_overrideable_reasons": non_overrideable_reasons,
             "blocking_reasons": blocking_reasons,
             "message": (
-                "Scene passed pre-persist verification."
+                "장면이 저장 전 검증을 통과했습니다."
                 if decision == "approve"
                 else (
-                    "Canon override is required before persistence."
+                    "저장하려면 캐논 오버라이드 승인이 필요합니다."
                     if decision == "needs-override"
-                    else "Scene failed pre-persist verification."
+                    else "장면이 저장 전 검증에 실패했습니다."
                 )
             ),
             "summary": {

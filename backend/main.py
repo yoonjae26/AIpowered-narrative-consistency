@@ -9,6 +9,7 @@ from backend.api.middleware.logging_middleware import LoggingMiddleware
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.consistency import router as consistency_router
+from backend.api.routes.documents import router as documents_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.narrative import router as narrative_router
 from backend.api.routes.projects import router as projects_router
@@ -46,6 +47,7 @@ async def narrative_error_handler(_: Request, exc: NarrativeError) -> JSONRespon
 
 app.include_router(auth_router)
 app.include_router(projects_router)
+app.include_router(documents_router)
 app.include_router(narrative_router)
 app.include_router(consistency_router)
 app.include_router(export_router)

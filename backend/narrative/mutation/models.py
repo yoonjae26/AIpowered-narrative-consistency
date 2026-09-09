@@ -52,6 +52,116 @@ class EventType(str, Enum):
     # Relationships
     RELATIONSHIP_FORMS  = "relationship_forms"
     RELATIONSHIP_CHANGES = "relationship_changes"
+    # Dialogue
+    DIALOGUE            = "dialogue"
+    # KG / extractor outputs — NOT indexed in RAG memory
+    CHAR_TRAIT          = "char_trait"
+    CHAR_EMOTION        = "char_emotion"
+
+
+# ---------------------------------------------------------------------------
+# Content classification — one layer above EventType
+# ---------------------------------------------------------------------------
+
+class EventCategory(str, Enum):
+    SCENE_ACTION        = "scene_action"       # narrative events worth RAG indexing
+    DIALOGUE            = "dialogue"           # character speech
+    RELATIONSHIP        = "relationship"       # social bonds
+    TRAIT               = "trait"              # KG trait extractions (internal)
+    EXTRACTOR_METADATA  = "extractor_metadata" # pipeline artifacts (internal)
+    TIMELINE            = "timeline"           # scene open/close markers
+    DEBUG               = "debug"              # developer / debug events
+
+
+EVENT_CATEGORY: dict[EventType, EventCategory] = {
+    # ── Indexable ────────────────────────────────────────────────────────────
+    EventType.CHARACTER_APPEARS:    EventCategory.SCENE_ACTION,
+    EventType.CHARACTER_EXITS:      EventCategory.SCENE_ACTION,
+    EventType.CHARACTER_CHANGES:    EventCategory.SCENE_ACTION,
+    EventType.DEATH:                EventCategory.SCENE_ACTION,
+    EventType.MURDER:               EventCategory.SCENE_ACTION,
+    EventType.INJURY:               EventCategory.SCENE_ACTION,
+    EventType.BIRTH:                EventCategory.SCENE_ACTION,
+    EventType.RESURRECTION:         EventCategory.SCENE_ACTION,
+    EventType.MARRIAGE:             EventCategory.SCENE_ACTION,
+    EventType.BETRAYAL:             EventCategory.SCENE_ACTION,
+    EventType.ALLIANCE:             EventCategory.SCENE_ACTION,
+    EventType.CONFLICT:             EventCategory.SCENE_ACTION,
+    EventType.DISCOVERY:            EventCategory.SCENE_ACTION,
+    EventType.TRAVEL:               EventCategory.SCENE_ACTION,
+    EventType.CAPTURE:              EventCategory.SCENE_ACTION,
+    EventType.ESCAPE:               EventCategory.SCENE_ACTION,
+    EventType.DIALOGUE:             EventCategory.DIALOGUE,
+    EventType.RELATIONSHIP_FORMS:   EventCategory.RELATIONSHIP,
+    EventType.RELATIONSHIP_CHANGES: EventCategory.RELATIONSHIP,
+    # ── Not indexed ──────────────────────────────────────────────────────────
+    EventType.CHAR_TRAIT:           EventCategory.TRAIT,
+    EventType.CHAR_EMOTION:         EventCategory.EXTRACTOR_METADATA,
+    EventType.SCENE_OPENS:          EventCategory.TIMELINE,
+    EventType.SCENE_CLOSES:         EventCategory.TIMELINE,
+    EventType.TIMELINE_BEAT:        EventCategory.TIMELINE,
+    EventType.WORLD_STATE_CHANGE:   EventCategory.TIMELINE,
+}
+
+INDEXABLE_CATEGORIES: frozenset[EventCategory] = frozenset({
+    EventCategory.SCENE_ACTION,
+    EventCategory.DIALOGUE,
+    EventCategory.RELATIONSHIP,
+})
+
+
+# ---------------------------------------------------------------------------
+# Retrieval profiles — named presets that control what sources + categories
+# the retriever pulls for a given query intent.
+# ---------------------------------------------------------------------------
+
+from dataclasses import dataclass as _dataclass
+
+
+@_dataclass(frozen=True)
+class RetrievalProfileSpec:
+    """Declares which source_types and event_categories to include.
+
+    source_types: HybridSearch document sources to allow ("scene", "character", "lore", "event").
+                  None means all source types pass through.
+    event_categories: for source_type="event" docs, only these categories are returned.
+                      None means all indexed event categories are returned.
+    """
+    source_types: frozenset[str] | None
+    event_categories: frozenset[EventCategory] | None
+
+
+class RetrievalProfile(str, Enum):
+    NARRATIVE  = "narrative"   # story events + dialogue — 서사 흐름 파악용
+    CHARACTER  = "character"   # character profiles + relationships — 인물 상태 파악용
+    REASONING  = "reasoning"   # broad context — 추론·설명 생성용
+    WORLD      = "world"       # scene + lore — 세계관 질문용
+
+
+PROFILE_SPEC: dict[RetrievalProfile, RetrievalProfileSpec] = {
+    RetrievalProfile.NARRATIVE: RetrievalProfileSpec(
+        source_types=frozenset({"scene", "event"}),
+        event_categories=frozenset({EventCategory.SCENE_ACTION, EventCategory.DIALOGUE}),
+    ),
+    RetrievalProfile.CHARACTER: RetrievalProfileSpec(
+        source_types=frozenset({"character", "event"}),
+        event_categories=frozenset({EventCategory.RELATIONSHIP}),
+        # NOTE: TRAIT events are not indexed (per INDEXABLE_CATEGORIES).
+        # Character documents naturally contain trait text (background, traits list).
+    ),
+    RetrievalProfile.REASONING: RetrievalProfileSpec(
+        source_types=None,  # all sources
+        event_categories=frozenset({
+            EventCategory.RELATIONSHIP,
+            EventCategory.SCENE_ACTION,
+            EventCategory.DIALOGUE,
+        }),
+    ),
+    RetrievalProfile.WORLD: RetrievalProfileSpec(
+        source_types=frozenset({"scene", "lore"}),
+        event_categories=None,
+    ),
+}
 
 
 # ---------------------------------------------------------------------------
